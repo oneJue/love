@@ -1,0 +1,16 @@
+# 本地真实数据不入库（私人沟通内容/照片）
+# 仓库内 data.json 始终保持干净种子
+data.local.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 临时/缓存
+node_modules/
+.cache/

@@ -1,0 +1,39 @@
+/* =========================================================================
+   theme: kawaii — 可爱日系
+   奶橙白底、提明度状态色、圆润字体、18px 圆角、圆点贴纸感
+   ========================================================================= */
+[data-theme="kawaii"] {
+  --bg: #FFF7F2;
+  --bg-grain: rgba(255, 180, 140, .05);
+  --card: #FFFFFF;
+  --card-2: #FFEEE4;
+  --ink: #5A4A42;
+  --muted: #B89E92;
+  --faint: #D9C4B8;
+  --line: #FBE3D6;
+  --line-dashed: 2px dotted #F5C9B5;
+
+  --m: #7FC4E0;            --m-soft: #E8F6FB;
+  --f: #FFA0C2;            --f-soft: #FFEDF4;
+
+  --pend: #F5B454;         --pend-bg: #FFF0D6;   --pend-ink: #B8761C;
+  --talk: #7FC4E0;         --talk-bg: #E8F6FB;   --talk-ink: #3E7E96;
+  --review: #C98AD9;       --review-bg: #F8EAFB; --review-ink: #7A4A86;
+  --ok: #9CCB80;           --ok-bg: #EEF7E4;     --ok-ink: #5A8A3E;
+  --hold: #C4B0A4;         --hold-bg: #F3EAE4;   --hold-ink: #8A7768;
+
+  --tape: rgba(255, 200, 170, .5);
+  --tape-edge: rgba(200, 140, 100, .15);
+
+  --ff-title: "ZCOOL KuaiLe", "Ma Shan Zheng", "PingFang SC", cursive;
+  --ff-body: "Zen Maru Gothic", -apple-system, "PingFang SC", sans-serif;
+
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 24px;
+
+  --rot-m: -.6deg;
+  --rot-f: .6deg;
+}
+[data-theme="kawaii"] .entry::before { width: 84px; height: 20px; border-radius: 12px; }
+[data-theme="kawaii"] .days-card .num { font-family: var(--ff-title); }

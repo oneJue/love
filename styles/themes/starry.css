@@ -1,0 +1,48 @@
+/* =========================================================================
+   theme: starry — 浪漫星空
+   深靛渐变底、玻璃卡片、雾紫+月光蓝、金尘点缀、发光阴影
+   ========================================================================= */
+[data-theme="starry"] {
+  --bg: #14132b;
+  --bg-grain: rgba(230, 195, 126, .05);
+  --card: rgba(40, 38, 70, .55);
+  --card-2: rgba(55, 50, 90, .6);
+  --ink: #E8E6F5;
+  --muted: #9B96C4;
+  --faint: #6E6A99;
+  --line: rgba(201, 184, 255, .18);
+  --line-dashed: 1px dashed rgba(201, 184, 255, .25);
+
+  --m: #7FD4E8;            --m-soft: rgba(127, 212, 232, .14);   /* 月光蓝 */
+  --f: #C9B8FF;            --f-soft: rgba(201, 184, 255, .14);   /* 雾紫 */
+
+  --pend: #E6C37E;         --pend-bg: rgba(230, 195, 126, .18);   --pend-ink: #E6C37E;
+  --talk: #7FD4E8;         --talk-bg: rgba(127, 212, 232, .18);   --talk-ink: #7FD4E8;
+  --review: #C9B8FF;       --review-bg: rgba(201, 184, 255, .18); --review-ink: #C9B8FF;
+  --ok: #8FE6A8;           --ok-bg: rgba(143, 230, 168, .18);     --ok-ink: #8FE6A8;
+  --hold: #9B96C4;         --hold-bg: rgba(155, 150, 196, .16);   --hold-ink: #9B96C4;
+
+  --tape: rgba(230, 195, 126, .35);
+  --tape-edge: rgba(230, 195, 126, .1);
+
+  --ff-title: "Ma Shan Zheng", "Caveat", cursive;
+
+  --sh-card: 0 4px 24px rgba(127, 212, 232, .08);
+  --sh-sticky: 0 8px 30px rgba(201, 184, 255, .15);
+}
+[data-theme="starry"] body {
+  background-image:
+    radial-gradient(var(--bg-grain) 1px, transparent 0),
+    radial-gradient(ellipse at top, rgba(127, 212, 232, .08), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(201, 184, 255, .1), transparent 60%);
+  background-size: 4px 4px, 100% 100%, 100% 100%;
+}
+[data-theme="starry"] .card,
+[data-theme="starry"] .entry,
+[data-theme="starry"] .result,
+[data-theme="starry"] .confirm-row,
+[data-theme="starry"] .placeholder-card {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+[data-theme="starry"] .tabbar { background: rgba(20, 19, 43, .85); backdrop-filter: blur(8px); }

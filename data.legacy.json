@@ -1,0 +1,15 @@
+{
+  "updatedAt": "2026-07-21",
+  "entries": [
+    {
+      "id": "2026-0721-01",
+      "date": "2026-07-21",
+      "who": "男方",
+      "title": "示例：旧格式留痕",
+      "maleView": "示例男方视角（旧 v1 结构，maleView 为纯字符串）。",
+      "femaleView": "示例女方视角（旧 v1 结构）。",
+      "result": "示例：旧 v1 把约定塞进 result 字段，迁移时由 result 拆分为 agreement/maleNote/femaleNote/confirmations。",
+      "status": "沟通中"
+    }
+  ]
+}

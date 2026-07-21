@@ -1,0 +1,35 @@
+/* =========================================================================
+   theme: minimal — 极简优雅
+   象牙白底、统一墨色、单色玫瑰豆沙点缀、衬线标题、去胶带去旋转、4px 圆角
+   ========================================================================= */
+[data-theme="minimal"] {
+  --bg: #FAFAF8;
+  --bg-grain: transparent;
+  --card: #FFFFFF;
+  --card-2: #F5F4F2;
+  --ink: #1F1F1F;
+  --muted: #8A8A8A;
+  --faint: #BDBDBD;
+  --line: #ECECEA;
+  --line-dashed: 1px solid #E2E2E0;
+
+  --m: #C97A8A;            --m-soft: #F8EEF0;   /* 玫瑰豆沙统一两性色 */
+  --f: #C97A8A;            --f-soft: #F8EEF0;
+
+  --ff-title: "Noto Serif SC", "Songti SC", serif;
+  --ff-body: -apple-system, "PingFang SC", "Noto Sans SC", sans-serif;
+
+  --r-md: 6px;
+  --r-lg: 8px;
+
+  --tape: transparent;
+  --sh-card: 0 1px 3px rgba(0,0,0,.04);
+  --sh-sticky: 0 2px 6px rgba(0,0,0,.06);
+
+  --rot-m: 0deg;
+  --rot-f: 0deg;
+}
+[data-theme="minimal"] .entry,
+[data-theme="minimal"] .entry:nth-child(even) { transform: none; }
+[data-theme="minimal"] .entry::before { display: none; }
+[data-theme="minimal"] .days-card .num { font-family: var(--ff-seriff, var(--ff-title)); font-weight: 300; }

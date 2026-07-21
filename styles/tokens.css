@@ -1,0 +1,63 @@
+/* =========================================================================
+   tokens.css — 设计令牌（默认清新手账风 scrapbook）
+   主题切换：由各 themes/*.css 覆盖 :root 变量，不改 DOM
+   ========================================================================= */
+:root {
+  /* —— 底色 / 纸张 —— */
+  --bg: #F4F6F5;
+  --bg-grain: rgba(42, 63, 56, .035);
+  --card: #FFFFFF;
+  --card-2: #EEF2F0;
+  --ink: #28312E;
+  --muted: #6F7A76;
+  --faint: #98A29E;
+
+  /* —— 分隔 —— */
+  --line: #DCE3DF;
+  --line-dashed: 1px dashed #C8D2CD;
+
+  /* —— 男 / 女方色 —— */
+  --m: #477982;             --m-soft: #E4EFF0;
+  --f: #D06F6B;             --f-soft: #FBEAE9;
+
+  /* —— 状态色（5 态） —— */
+  --pend: #C58A2C;          --pend-bg: #FFF3DA;   --pend-ink: #805913;   /* 待沟通 */
+  --talk: #4F8791;          --talk-bg: #E3F0F2;   --talk-ink: #315D64;   /* 沟通中 */
+  --review: #8A6B91;        --review-bg: #F1EAF3; --review-ink: #5F4764; /* 待确认 */
+  --ok: #5D8B6A;            --ok-bg: #E6F1E8;     --ok-ink: #3E6549;     /* 已和解 */
+  --hold: #7C8581;          --hold-bg: #ECEFED;   --hold-ink: #555F5A;   /* 已搁置 */
+
+  /* —— 和纸胶带 —— */
+  --tape: rgba(245, 213, 153, .64);
+  --tape-edge: rgba(197, 138, 44, .14);
+
+  /* —— 字体 —— */
+  --ff-title: "Iowan Old Style", "Noto Serif SC", "Songti SC", serif;
+  --ff-body: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --ff-serif: "Noto Serif SC", "Songti SC", serif;
+  --ff-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+
+  /* —— 圆角 —— */
+  --r-chip: 4px;
+  --r-sm: 8px;
+  --r-md: 8px;
+  --r-lg: 8px;
+  --r-pill: 999px;
+
+  /* —— 阴影 —— */
+  --sh-paper: 0 1px 2px rgba(30, 45, 40, .06);
+  --sh-card: 0 8px 28px rgba(30, 45, 40, .07);
+  --sh-sticky: 0 14px 36px rgba(30, 45, 40, .13);
+
+  /* —— 间距尺度 —— */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 56px;
+
+  /* —— 内容宽 —— */
+  --wrap: 920px;
+  --wrap-wide: 1080px;
+
+  /* —— 视角便签微旋（男左女右）—— */
+  --rot-m: -1deg;
+  --rot-f: 1deg;
+}

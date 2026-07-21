@@ -1,0 +1,57 @@
+{
+  "updatedAt": "2026-07-21",
+  "meta": {
+    "startDate": null,
+    "anniversaryName": "在一起",
+    "partnerNames": { "male": "他", "female": "她" },
+    "timezone": "Asia/Shanghai"
+  },
+  "entries": [
+    {
+      "id": 1,
+      "title": "示例：试试记一笔",
+      "occurrenceDate": "2026-07-21",
+      "createdAt": "2026-07-21T00:00:00.000Z",
+      "updatedAt": "2026-07-21T00:00:00.000Z",
+      "raisedBy": "男方",
+      "severity": "一般",
+      "tags": ["示例"],
+      "description": {
+        "text": "这是一条示例记录，展示事实层：客观写下发生了什么，不带情绪。仓库公开版用这条占位，真实记录请自行记。",
+        "updatedAt": "2026-07-21T00:00:00.000Z",
+        "updatedBy": "男方"
+      },
+      "attachments": [],
+      "maleView": {
+        "text": "示例男方视角：写下你眼里发生了什么、你的感受。对方稍后会写 TA 的。",
+        "updatedAt": "2026-07-21T00:00:00.000Z",
+        "writtenBy": "男方"
+      },
+      "femaleView": {
+        "text": "示例女方视角：从你的角度补一段。两份视角都写完后可以起草约定。",
+        "updatedAt": "2026-07-21T00:00:00.000Z",
+        "writtenBy": "女方"
+      },
+      "agreement": { "text": "", "updatedAt": null, "updatedBy": null },
+      "maleNote": { "text": "", "updatedAt": null },
+      "femaleNote": { "text": "", "updatedAt": null },
+      "confirmations": {
+        "male": { "confirmed": false, "at": null },
+        "female": { "confirmed": false, "at": null }
+      },
+      "status": "沟通中",
+      "resolutionDate": null,
+      "shelvedReason": null,
+      "shelvedFrom": null,
+      "gentleReview": false,
+      "history": [
+        { "at": "2026-07-21T00:00:00.000Z", "by": "系统", "summary": "示例种子记录" }
+      ]
+    }
+  ],
+  "anniversaries": [],
+  "photos": [],
+  "albums": [],
+  "timeline": [],
+  "messages": []
+}
