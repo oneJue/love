@@ -17,7 +17,11 @@ body {
   -webkit-font-smoothing: antialiased;
   /* 给底部 tab 留空间 */
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  /* R3 移动端：vh 在 iOS Safari 地址栏伸缩时取最大值致底部 tabbar 多滚；用 dvh，vh 作 fallback。
+     overflow-x 兜底防长无空格 URL 撑出横向滚动（与 pre-wrap overflow-wrap:anywhere 配合）。 */
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 h1, h2, h3, p, ul, ol { margin: 0; }
@@ -124,6 +128,15 @@ a { color: var(--m); text-decoration: none; }
 .home-setup p { color: var(--muted); font-size: 13px; margin: 0 auto var(--s-4); max-width: 340px; }
 
 .home-quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); margin-bottom: var(--s-6); }
+/* R3 F3: 首页总量统计四 tile——纯展示聚合，默认 4 列，移动端 2 列 */
+.home-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); margin-bottom: var(--s-6); }
+.home-stat {
+  min-width: 0; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
+  color: var(--ink); padding: var(--s-3) var(--s-2); cursor: pointer; font-family: var(--ff-body);
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.home-stat strong { font-family: var(--ff-title); font-size: 24px; font-weight: 650; line-height: 1.1; }
+.home-stat small { color: var(--muted); font-size: 11px; }
 .home-quick-actions button {
   min-width: 0; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
   color: var(--ink); padding: var(--s-3); cursor: pointer; font-family: var(--ff-body); text-align: left;
@@ -136,6 +149,15 @@ a { color: var(--m); text-decoration: none; }
 .home-milestone > span { color: var(--muted); font-size: 12px; }
 .home-milestone strong { font-size: 14px; }
 .home-milestone em { margin-left: auto; color: var(--f); font-family: var(--ff-title); font-size: 18px; font-style: normal; }
+/* R3 F1: 纪念日管理入口——小字号 ghost 链接 */
+.home-milestone-manage {
+  flex: none; border: 1px solid var(--line); background: var(--card); cursor: pointer;
+  font-family: var(--ff-body); font-size: 12px; color: var(--muted);
+  padding: 4px 12px; border-radius: var(--r-pill); transition: border-color .16s, color .16s, background .16s;
+}
+.home-milestone-manage:hover { border-color: var(--m); color: var(--m); background: var(--m-soft); }
+/* R3-issue5: 首页纪念日区块的空状态——em 作为轻提示，弱化倒计时强色 */
+.home-milestone-empty em { color: var(--faint); font-size: 13px; font-family: var(--ff-body); }
 .home-section { margin: var(--s-6) 0; }
 .home-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); }
 .home-section-head h2 { font-size: 15px; font-weight: 650; }
@@ -170,6 +192,7 @@ a { color: var(--m); text-decoration: none; }
   .home-quick-actions button { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; padding: var(--s-3) var(--s-1); }
   .home-quick-actions button > span { font-size: 18px; }
   .home-quick-actions small { display: none; }
+  .home-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* —— 小标题 —— */
@@ -273,7 +296,7 @@ a { color: var(--m); text-decoration: none; }
   position: relative;
 }
 .result .rlabel { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: var(--s-1); display: block; }
-.result .rtext { font-family: var(--ff-serif); white-space: pre-wrap; color: var(--ink); }
+.result .rtext { font-family: var(--ff-serif); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
 .result .rsub { margin-top: var(--s-3); }
 .result .rsub .rlabel { font-size: 11px; }
 .result .rsub .rtext { font-family: var(--ff-body); font-size: 13px; color: var(--muted); }
@@ -308,7 +331,7 @@ a { color: var(--m); text-decoration: none; }
 
 /* FAB 右下角加号 */
 .fab {
-  position: fixed; right: 20px; bottom: 96px; z-index: 50;
+  position: fixed; right: 20px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 50;
   width: 52px; height: 52px; border-radius: var(--r-pill);
   background: var(--m); color: #fff; border: none; font-size: 26px;
   box-shadow: var(--sh-sticky); cursor: pointer; line-height: 1;
@@ -363,7 +386,7 @@ footer.app-foot { text-align: center; color: var(--faint); font-size: 12px; padd
 }
 .tl-date { font-size: 12px; color: var(--m); font-family: var(--ff-mono); }
 .tl-title { font-size: 16px; font-weight: 650; margin: var(--s-1) 0; }
-.tl-desc { font-size: 14px; color: var(--muted); white-space: pre-wrap; }
+.tl-desc { font-size: 14px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .tl-by { margin-top: var(--s-2); font-size: 11px; color: var(--faint); }
 
 /* —— 留言 —— */
@@ -375,10 +398,25 @@ footer.app-foot { text-align: center; color: var(--faint); font-size: 12px; padd
 .msg-arrow { color: var(--faint); }
 .msg-mood { background: var(--card-2); padding: 1px 8px; border-radius: var(--r-pill); }
 .msg-pin { color: var(--review-ink); background: var(--review-bg); padding: 1px 7px; border-radius: var(--r-pill); }
+/* R4 F4: 置顶切换按钮——小字号 ghost 胶囊，与纪念日管理入口同家族风格 */
+.msg-pin-btn {
+  flex: none; border: 1px solid var(--line); background: var(--card); cursor: pointer;
+  font: 12px var(--ff-body); color: var(--muted);
+  padding: 2px 10px; border-radius: var(--r-pill); transition: border-color .16s, color .16s, background .16s;
+}
+.msg-pin-btn:hover { border-color: var(--review); color: var(--review-ink); background: var(--review-bg); }
 .msg-date { margin-left: auto; font-family: var(--ff-mono); }
-.msg.pinned { border-color: var(--f); box-shadow: var(--sh-sticky); }
-.msg.mine.pinned { border-color: var(--m); }
-.msg-text { margin-top: var(--s-3); font-family: var(--ff-serif); font-size: 16px; white-space: pre-wrap; line-height: 1.8; }
+/* R5-s2: 置顶留言视觉浮起——统一 review 色背景/边色 + sticky 投影，与 .msg-pin 标签同族。
+   删 .msg.mine.pinned 覆盖：mine 侧置顶前 border-color 已是 var(--m)，旧规则置顶后仍 var(--m)
+   毫无差异；改 review 色后 mine/theirs 置顶都浮起明显。叠加 .unread 时其 box-shadow 优先级更高
+   会盖掉 sticky 投影，但 background 仍在不被覆盖，置顶态视觉不丢失。 */
+.msg.pinned { border-color: var(--review); background: var(--review-bg); box-shadow: var(--sh-sticky); }
+.msg-text { margin-top: var(--s-3); font-family: var(--ff-serif); font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+/* R2-4: 未读留言视觉——对方发给本侧且未读时，左侧主色描边 + 正文加粗 + 小圆点角标 */
+.msg.unread { border-left-color: var(--f); box-shadow: 0 0 0 1px var(--f-soft) inset, var(--sh-paper); }
+.msg.unread .msg-from { font-weight: 700; }
+.msg.unread .msg-text { font-weight: 600; }
+.msg-unread-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--f); flex: none; }
 
 /* —— 照片墙 polaroid —— */
 .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--s-4); padding: var(--s-3) 0; }
@@ -406,6 +444,28 @@ footer.app-foot { text-align: center; color: var(--faint); font-size: 12px; padd
 }
 .photo-viewer-caption { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) var(--s-4); color: #fff; }
 .photo-viewer-caption time { color: rgba(255,255,255,.65); font-size: 12px; }
+/* R3 F5: 照片查看器左右切换按钮，复用 close 的半透明圆形样式 */
+.photo-viewer-nav {
+  position: absolute; z-index: 2; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; border: 0; border-radius: var(--r-pill);
+  background: rgba(0,0,0,.45); color: #fff; font-size: 28px; line-height: 1;
+  cursor: pointer; display: grid; place-items: center; padding: 0;
+  transition: background .16s;
+}
+.photo-viewer-nav.prev { left: 12px; }
+.photo-viewer-nav.next { right: 12px; }
+.photo-viewer-nav:hover { background: rgba(0,0,0,.7); }
+/* R3-issue4: 照片元数据损坏/原图丢失占位——灰底 + 替代文案，避免破图标 */
+.photo-broken {
+  background: var(--card-2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font: 13px var(--ff-body); text-align: center;
+  min-height: 200px; width: 100%;
+}
+.photo-viewer .photo-broken { color: rgba(255,255,255,.6); background: transparent; min-height: 60vh; }
+@media (max-width: 480px) {
+  .photo-viewer-nav { width: 40px; height: 40px; font-size: 24px; }
+}
 
 /* —— T3 子 tab —— */
 .subtabs { display: flex; gap: var(--s-2); margin-bottom: var(--s-4); }
@@ -500,10 +560,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .view-toolbar strong { font-size: 17px; letter-spacing: 0; }
 .toolbar-action {
   border-radius: var(--r-md); min-height: 40px; font-weight: 650;
-  box-shadow: 0 6px 16px rgba(43, 85, 91, .13);
+  box-shadow: 0 6px 16px var(--sh-accent);
   transition: filter .16s, transform .16s, box-shadow .16s;
 }
-.toolbar-action:hover { filter: brightness(.96); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(43, 85, 91, .17); }
+.toolbar-action:hover { filter: brightness(.96); transform: translateY(-1px); box-shadow: 0 8px 20px var(--sh-accent); }
 .toolbar-action:active { transform: translateY(0); box-shadow: var(--sh-paper); }
 
 .card { border-radius: var(--r-md); box-shadow: var(--sh-paper); }
@@ -534,6 +594,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .home-quick-actions button:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px); box-shadow: var(--sh-card); }
 .home-quick-actions button:active { transform: translateY(0); }
 .home-quick-actions strong { font-weight: 700; }
+.home-stat { min-height: 62px; box-shadow: var(--sh-paper); transition: border-color .16s, background .16s, transform .16s, box-shadow .16s; }
+.home-stat:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px); box-shadow: var(--sh-card); }
+.home-stat:active { transform: translateY(0); }
 .home-milestone { border-top: 1px solid var(--line); padding: var(--s-4) 0; }
 .home-milestone em { color: var(--f); font-weight: 600; letter-spacing: 0; }
 .home-section-head h2 { font-size: 16px; }
@@ -544,14 +607,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .filters { gap: var(--s-2); scrollbar-width: none; }
 .filters::-webkit-scrollbar { display: none; }
 .filters button { min-height: 34px; transition: border-color .16s, background .16s, color .16s; }
-.filters button.active { transform: none; box-shadow: 0 4px 12px rgba(43, 85, 91, .14); }
+.filters button.active { transform: none; box-shadow: 0 4px 12px var(--sh-accent); }
 
 .fab {
   width: 54px; height: 54px; font-size: 25px;
-  box-shadow: 0 12px 30px rgba(43, 85, 91, .26);
+  box-shadow: 0 12px 30px var(--sh-accent-strong);
   transition: filter .16s, transform .16s, box-shadow .16s;
 }
-.fab:hover { filter: brightness(.96); transform: translateY(-2px); box-shadow: 0 16px 34px rgba(43, 85, 91, .30); }
+.fab:hover { filter: brightness(.96); transform: translateY(-2px); box-shadow: 0 16px 34px var(--sh-accent-strong); }
 .fab:active { transform: scale(.96); }
 
 .tabbar {
@@ -565,7 +628,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .tabbar button:hover { background: var(--card-2); }
 .tabbar button.active { font-weight: 700; }
-.tabbar button.active .ico { background: var(--m-soft); transform: none; }
+.tabbar button.active .ico { background: var(--m-soft); }
 
 .tl-list::before { border-left-style: solid; }
 .tl-dot { background: var(--m); box-shadow: 0 0 0 3px var(--m-soft); }

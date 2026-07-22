@@ -9,6 +9,7 @@ import * as store from './store.js';
 import * as editor from './editor.js';
 import { computeStatus, pendingAction } from './status-machine.js';
 import { prettyDate } from './date-math.js';
+import { escapeHtml, sameId } from './util.js';
 
 let activeFilter = '全部';
 let showShelved = false;
@@ -36,16 +37,49 @@ export function mount(el) {
   bindActions(el);
 }
 
-function statusClass(s) { return s; }
-
 function viewNote(view, label, side) {
   if (!view) view = { text: '' };
   const text = (view.text || '').trim();
   return `
     <div class="view-note ${side}">
       <span class="vlabel">${label}</span>
-      <div class="vtext">${text ? esc(text) : '<span class="vempty">还没写</span>'}</div>
+      <div class="vtext">${text ? escapeHtml(text) : '<span class="vempty">还没写</span>'}</div>
     </div>`;
+}
+
+// —— 留痕时间线渲染（history：at/by/summary，永不硬删的追溯承诺）——
+function renderHistory(entry, mode) {
+  const hist = Array.isArray(entry.history) ? entry.history : [];
+  if (!hist.length) return '';
+  // 最新在前，便于一眼看到最近一次操作
+  const rows = hist.slice().reverse().map(h => {
+    const when = h.at ? fmtHistory(h.at) : '';
+    const who = h.by ? escapeHtml(h.by) : '';
+    return `<li class="hist-row">
+      <span class="hist-when">${escapeHtml(when)}</span>
+      ${who ? `<span class="hist-by ${whoClass(h.by)}">${who}</span>` : ''}
+      <span class="hist-what">${escapeHtml(h.summary || '')}</span>
+    </li>`;
+  }).join('');
+  return `<details class="entry-history${hist.length ? ' open-nudge' : ''}"${mode === 'review' ? ' open' : ''}>
+    <summary>留痕 · 共 ${hist.length} 次</summary>
+    <ol class="hist-list">${rows}</ol>
+  </details>`;
+}
+
+function fmtHistory(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } catch { return ''; }
+}
+
+function whoClass(by) {
+  if (by === '男方') return 'm';
+  if (by === '女方') return 'f';
+  return 'sys';
 }
 
 // —— 事实层渲染（description + 附件缩略图，排在视角层之前）——
@@ -55,18 +89,18 @@ function renderFact(entry, mode) {
   if (!desc && !atts.length) {
     // 无事实层内容：除非已和解只读，否则给个柔提示引导补
     if (mode === 'review') return '';
-    return `<section class="entry-section fact-layer empty-fact"><h3>发生了什么</h3><div class="fact-empty">还没有客观描述 · <button class="link-btn" data-act="edit-fact">现在补充</button></div></section>`;
+    return `<section class="entry-section fact-layer empty-fact"><h3>发生了什么</h3><div class="fact-empty">还没有客观描述 · <button type="button" class="link-btn" data-act="edit-fact">现在补充</button></div></section>`;
   }
   return `
     <section class="entry-section fact-layer">
       <h3>发生了什么</h3>
-      ${desc ? `<div class="fact-desc">${esc(desc)}</div>` : ''}
+      ${desc ? `<div class="fact-desc">${escapeHtml(desc)}</div>` : ''}
       ${atts.length ? `<div class="attach-grid">
         ${atts.map(a => `
           <div class="attach-box" data-att="${a.id}">
             ${a.thumb
-              ? `<img src="${a.thumb}" alt="${esc(a.name||'')}" data-lightbox="${a.id}" loading="lazy">`
-              : `<div class="no-thumb">${esc((a.name||'附件').slice(0,6))}</div>`}
+              ? `<img src="${a.thumb}" alt="${escapeHtml(a.name||'')}" data-lightbox="${a.id}" loading="lazy">`
+              : `<div class="no-thumb">${escapeHtml((a.name||'附件').slice(0,6))}</div>`}
           </div>`).join('')}
       </div>` : ''}
     </section>`;
@@ -83,7 +117,7 @@ function confirmRow(entry, side, whoLabel, meSide, mode) {
       <span class="ck"></span>
       <span class="who">${whoLabel}</span>
       ${canConfirm
-        ? `<button class="action-btn primary" data-act="confirm" data-side="${side}">${COPY.confirm}</button>`
+        ? `<button type="button" class="action-btn primary" data-act="confirm" data-side="${side}">${COPY.confirm}</button>`
         : (done && c.at ? `<span class="at">${fmtTime(c.at)}</span>` : '<span class="at">待确认</span>')}
     </div>`;
 }
@@ -109,7 +143,7 @@ function entryActions(entry, meSide, mode) {
   const myConf = entry.confirmations && entry.confirmations[meSide];
   const myConfirmed = myConf && myConf.confirmed;
   const btn = (act, label, cls = '', disabled = false, dataSide = '') =>
-    `<button class="action-btn ${cls}" ${disabled ? 'disabled' : ''} data-act="${act}"${dataSide ? ` data-side="${dataSide}"` : ''}>${label}</button>`;
+    `<button type="button" class="action-btn ${cls}" ${disabled ? 'disabled' : ''} data-act="${act}"${dataSide ? ` data-side="${dataSide}"` : ''}>${label}</button>`;
 
   // 待确认：显示"已确认·等对方"正文态（非按钮）
   let actions = [];
@@ -164,16 +198,16 @@ function entryCard(entry, meSide, mode) {
       <div class="entry-topline">
         <div class="entry-meta">
           <span class="entry-id">NO. ${entry.id}</span>
-          <time class="entry-date" datetime="${esc(entry.occurrenceDate)}">${prettyDate(entry.occurrenceDate)}</time>
-          <span class="entry-who ${entry.raisedBy === '男方' ? 'male' : 'female'}">${esc(entry.raisedBy)}提出</span>
-          ${entry.severity ? `<span class="entry-severity">${esc(entry.severity)}</span>` : ''}
+          <time class="entry-date" datetime="${escapeHtml(entry.occurrenceDate)}">${prettyDate(entry.occurrenceDate)}</time>
+          <span class="entry-who ${entry.raisedBy === '男方' ? 'male' : 'female'}">${escapeHtml(entry.raisedBy)}提出</span>
+          ${entry.severity ? `<span class="entry-severity">${escapeHtml(entry.severity)}</span>` : ''}
         </div>
-        <span class="status ${statusClass(status)}">${status}</span>
+        <span class="status ${status}">${status}</span>
       </div>
-      <h2 class="entry-title">${esc(entry.title)}</h2>
-      ${shelved && entry.shelvedReason ? `<div class="shelved-banner">先放放了：${esc(entry.shelvedReason.slice(0, 24))}</div>` : ''}
+      <h2 class="entry-title">${escapeHtml(entry.title)}</h2>
+      ${shelved && entry.shelvedReason ? `<div class="shelved-banner">先放放了：${escapeHtml(entry.shelvedReason.slice(0, 24))}</div>` : ''}
       ${actHint ? `<div class="entry-next">${todoBadge(entry, meSide)}<span>${actHint}</span></div>` : ''}
-      <details class="entry-context" ${mode === 'review' ? 'open' : ''}>
+      <details class="entry-context"${mode === 'review' ? ' open' : ''}>
         <summary>
           <span>事件与双方视角</span>
           <small>${factReady ? '事实已记录' : '待补事实'} · ${viewCount}/2 份视角</small>
@@ -188,17 +222,18 @@ function entryCard(entry, meSide, mode) {
             </div>
           </section>
           ${!agText && (mNote || fNote) ? `<div class="context-notes">
-            ${mNote ? `<p><strong>男方：</strong>${esc(mNote)}</p>` : ''}
-            ${fNote ? `<p><strong>女方：</strong>${esc(fNote)}</p>` : ''}
+            ${mNote ? `<p><strong>男方：</strong>${escapeHtml(mNote)}</p>` : ''}
+            ${fNote ? `<p><strong>女方：</strong>${escapeHtml(fNote)}</p>` : ''}
           </div>` : ''}
+          ${renderHistory(entry, mode)}
         </div>
       </details>
       ${agText ? `<section class="entry-section result">
         <div class="result-head"><h3>共同约定</h3><span>${agText ? '等待双方确认' : '下一步'}</span></div>
-        <div class="rtext">${esc(entry.agreement.text)}</div>
+        <div class="rtext">${escapeHtml(entry.agreement.text)}</div>
         ${(mNote || fNote) ? `<div class="rsub">
-          ${mNote ? `<span class="rlabel">男方说</span><div class="rtext">${esc(mNote)}</div>` : ''}
-          ${fNote ? `<span class="rlabel">女方说</span><div class="rtext">${esc(fNote)}</div>` : ''}
+          ${mNote ? `<span class="rlabel">男方说</span><div class="rtext">${escapeHtml(mNote)}</div>` : ''}
+          ${fNote ? `<span class="rlabel">女方说</span><div class="rtext">${escapeHtml(fNote)}</div>` : ''}
         </div>` : ''}
         <div class="confirms">
           ${confirmRow(entry, 'male', '男方', meSide, mode)}
@@ -253,7 +288,7 @@ function render(el) {
     </div>`;
 
     const shelvedToggle = shelvedCount && activeFilter === '全部'
-      ? `<button class="toggle-shelved" data-toggle>${showShelved ? '隐藏搁置' : `显示搁置 (${shelvedCount})`}</button>`
+      ? `<button type="button" class="toggle-shelved" data-toggle>${showShelved ? '隐藏搁置' : `显示搁置 (${shelvedCount})`}</button>`
       : '';
 
     el.innerHTML = `
@@ -286,7 +321,7 @@ function render(el) {
         card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1400); }
     }
   }).catch(err => {
-    el.innerHTML = `<div class="empty">无法加载：${esc(err.message)}<br>请用 <code>python3 -m http.server 8000</code> 启动</div>`;
+    el.innerHTML = `<div class="empty">无法加载：${escapeHtml(err.message)}<br>请用 <code>python3 -m http.server 8000</code> 启动</div>`;
   });
 }
 
@@ -313,7 +348,7 @@ export function bindActions(rootEl) {
       const card = lb.closest('.entry');
       const entry = card && store.getEntry(card.dataset.id);
       const attId = lb.dataset.lightbox;
-      const meta = entry && (entry.attachments || []).find(a => String(a.id) === String(attId));
+      const meta = entry && (entry.attachments || []).find(a => sameId(a.id, attId));
       if (meta) openLightbox(meta);
       e.stopPropagation(); return;
     }
@@ -329,13 +364,13 @@ export function bindActions(rootEl) {
 // —— 附件：删除（元数据 + IDB blob）——
 async function removeAttachment(entryId, attId) {
   const entry = store.getEntry(entryId);
-  const meta = entry && (entry.attachments || []).find(a => String(a.id) === String(attId));
+  const meta = entry && (entry.attachments || []).find(a => sameId(a.id, attId));
   // 先删 blob，再删元数据并留痕
   try { if (meta) await (await import('./attachments.js')).deleteBlob(meta.storeKey); } catch (_) {}
   store.removeAttachment(entryId, store.getMeSide(), attId).catch(err => editor.toast(err.message));
 }
 
-// —— lightbox 大图 ——
+// —— lightbox 大图（走 activateDialog，统一 Esc/焦点/滚动锁，与相册 viewer 对齐）——
 async function openLightbox(meta) {
   const attMod = await import('./attachments.js');
   let src = meta.thumb || null;
@@ -346,10 +381,15 @@ async function openLightbox(meta) {
   if (!src) { editor.toast('无法查看原图'); return; }
   const mask = document.createElement('div');
   mask.className = 'lightbox-mask';
-  mask.innerHTML = `<img src="${src}" alt=""><button class="lb-close" type="button">×</button>`;
-  document.body.appendChild(mask);
-  const close = () => { mask.remove(); if (src && src.startsWith('blob:')) URL.revokeObjectURL(src); };
-  mask.addEventListener('click', e => { if (e.target === mask || e.target.classList.contains('lb-close')) close(); });
+  const altText = meta.name || meta.caption || '附件图片';
+  mask.innerHTML = `
+    <div class="modal photo-viewer" role="document">
+      <h3 class="sr-only">查看原图</h3>
+      <button class="photo-viewer-close" type="button" aria-label="关闭">×</button>
+      <img src="${src}" alt="${escapeHtml(altText)}">
+    </div>`;
+  editor.activateDialog(mask, () => { if (src && src.startsWith('blob:')) URL.revokeObjectURL(src); });
+  mask.querySelector('.photo-viewer-close').addEventListener('click', () => mask._close());
 }
 
 function dispatchAction(act, id, side) {
@@ -357,13 +397,13 @@ function dispatchAction(act, id, side) {
   const entry = store.getEntry(id);
   if (!entry) return;
   if (act === 'add-view' || act === 'edit-view') {
-    editor.openViewSheet({ entry, meSide, onDone: noop });
+    editor.openViewSheet({ entry, meSide, onDone: () => {} });
   } else if (act === 'edit-fact') {
-    editor.openFactSheet({ entry, meSide, onDone: noop });
+    editor.openFactSheet({ entry, meSide, onDone: () => {} });
   } else if (act === 'draft-agreement' || act === 'edit-agreement') {
-    editor.openAgreementSheet({ entry, meSide, edit: act === 'edit-agreement', onDone: noop });
+    editor.openAgreementSheet({ entry, meSide, edit: act === 'edit-agreement', onDone: () => {} });
   } else if (act === 'edit-note') {
-    editor.openNoteSheet({ entry, meSide, onDone: noop });
+    editor.openNoteSheet({ entry, meSide, onDone: () => {} });
   } else if (act === 'confirm') {
     store.setMyConfirm(id, meSide).then(updated => {
       if (computeStatus(updated) === '已和解') {
@@ -402,12 +442,6 @@ function dispatchAction(act, id, side) {
   }
 }
 
-function noop() {}
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
 function fmtTime(iso) {
   if (!iso) return '';
   try {

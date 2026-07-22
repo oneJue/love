@@ -2,6 +2,9 @@
 # 仓库内 data.json 始终保持干净种子
 data.local.json
 
+# 后端运行时数据（SQLite + 上传附件）
+server/data/
+
 # 系统文件
 .DS_Store
 Thumbs.db

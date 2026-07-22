@@ -3,6 +3,8 @@ import * as store from './store.js';
 import * as attachments from './attachments.js';
 import { activateDialog, toast } from './editor.js';
 import { sideLabel } from './schema.js';
+import { toISO, today as todayDate } from './date-math.js';
+import { escapeHtml, sameId } from './util.js';
 
 function openDialog(innerHTML, onClose) {
   const mask = document.createElement('div');
@@ -11,10 +13,11 @@ function openDialog(innerHTML, onClose) {
   return activateDialog(mask, onClose);
 }
 
+// date-math.today() 返回本地 Date 对象（零时分）。表单 input[type=date] 的 value/max
+// 需要 'YYYY-MM-DD' 字符串，故经 toISO 转换。统一调用 date-math 单源，避免与旧的本地
+// today()（toISOString 切片）实现漂移导致跨时区边界差一天。
 function today() {
-  const date = new Date();
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
+  return toISO(todayDate());
 }
 
 function setBusy(button, busy, busyText, idleText) {
@@ -101,12 +104,59 @@ export function openRelationshipSheet({ data, onDone } = {}) {
         <label for="relationship-name">这段关系的称呼</label>
         <input id="relationship-name" type="text" maxlength="12" value="${escapeHtml(meta.anniversaryName || '在一起')}" placeholder="在一起" />
       </div>
+      <div class="field">
+        <label>纪念日管理</label>
+        <div class="anni-list" data-anni-list></div>
+        <button type="button" class="action-btn ghost" data-add-anni>＋ 添加纪念日</button>
+      </div>
       <div class="inline-error" role="alert"></div>
       <div class="btns">
         <button type="button" data-close>取消</button>
         <button type="button" class="primary" data-save>保存资料</button>
       </div>
     </div>`);
+  // —— 纪念日管理：chip 即时增删（add/remove 经 store 落盘 + broadcast），保存资料按钮仅管 meta 字段 ——
+  const anniListEl = mask.querySelector('[data-anni-list]');
+  const renderAnniList = () => {
+    const list = store.getCachedSync()?.anniversaries || [];
+    anniListEl.innerHTML = list.length
+      ? list.map(a => `
+        <div class="anni-chip">
+          <span class="anni-chip-name">${escapeHtml(a.title)}</span>
+          <span class="anni-chip-date">${escapeHtml(a.date)}${a.recurring ? ' · 每年' : ''}</span>
+          <button type="button" class="anni-chip-edit" data-edit-anni="${escapeHtml(a.id)}" aria-label="编辑纪念日">✎</button>
+          <button type="button" class="anni-chip-del" data-del-anni="${escapeHtml(a.id)}" aria-label="删除纪念日">×</button>
+        </div>`).join('')
+      : '<p class="single-hint" style="margin:4px 0 8px">还没有纪念日。生日、相恋日、第一次旅行，都可以记在这里。</p>';
+  };
+  renderAnniList();
+  mask.querySelector('[data-add-anni]').addEventListener('click', () => {
+    openAnniversarySheet({
+      onDone: () => { renderAnniList(); if (onDone) onDone(); },
+    });
+  });
+  anniListEl.addEventListener('click', async event => {
+    const editB = event.target.closest('[data-edit-anni]');
+    const delB = event.target.closest('[data-del-anni]');
+    if (delB) {
+      const id = delB.dataset.delAnni;
+      try { await store.removeAnniversary(id); }
+      catch (err) { toast(err.message || '删除失败'); return; }
+      renderAnniList();
+      if (onDone) onDone();
+      return;
+    }
+    if (editB) {
+      const id = editB.dataset.editAnni;
+      const cur = (store.getCachedSync()?.anniversaries || []).find(a => sameId(a.id, id));
+      if (!cur) return;
+      openAnniversarySheet({
+        anniversary: cur,
+        onDone: () => { renderAnniList(); if (onDone) onDone(); },
+      });
+    }
+  });
+
   mask.querySelector('[data-close]').addEventListener('click', () => mask._close());
   mask.querySelector('[data-save]').addEventListener('click', async event => {
     const error = mask.querySelector('.inline-error');
@@ -126,6 +176,54 @@ export function openRelationshipSheet({ data, onDone } = {}) {
     } catch (err) {
       error.textContent = err.message;
       setBusy(button, false, '保存中…', '保存资料');
+    }
+  });
+}
+
+// R3 F1: 纪念日编辑 sheet（title/date/recurring），复用 openDialog + store.upsertAnniversary。
+function openAnniversarySheet({ anniversary, onDone } = {}) {
+  const isEdit = Boolean(anniversary);
+  const mask = openDialog(`
+    <div class="modal composer-sheet">
+      <h3>${isEdit ? '编辑纪念日' : '添加纪念日'}</h3>
+      <p class="sub-hint">首页会按日期算出“下一个纪念日”倒计时。</p>
+      <div class="field">
+        <label for="anni-title">名称</label>
+        <input id="anni-title" type="text" maxlength="20" value="${escapeHtml(anniversary?.title || '')}" placeholder="比如：相恋纪念日" />
+      </div>
+      <div class="field">
+        <label for="anni-date">日期</label>
+        <input id="anni-date" type="date" value="${escapeHtml(anniversary?.date || today())}" />
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="anni-recurring" ${anniversary?.recurring ? 'checked' : ''} />
+        <span>每年重复（按月日算下次）</span>
+      </label>
+      <div class="inline-error" role="alert"></div>
+      <div class="btns">
+        <button type="button" data-close>取消</button>
+        <button type="button" class="primary" data-save>${isEdit ? '保存' : '添加'}</button>
+      </div>
+    </div>`);
+  mask.querySelector('[data-close]').addEventListener('click', () => mask._close());
+  mask.querySelector('[data-save]').addEventListener('click', async event => {
+    const error = mask.querySelector('.inline-error');
+    error.textContent = '';
+    const button = event.currentTarget;
+    setBusy(button, true, '保存中…', isEdit ? '保存' : '添加');
+    try {
+      const result = await store.upsertAnniversary({
+        id: anniversary?.id,
+        title: mask.querySelector('#anni-title').value,
+        date: mask.querySelector('#anni-date').value,
+        recurring: mask.querySelector('#anni-recurring').checked,
+      });
+      mask._close();
+      toast(isEdit ? '纪念日已更新' : '纪念日已添加', { soft: true });
+      if (onDone) onDone(result);
+    } catch (err) {
+      error.textContent = err.message;
+      setBusy(button, false, '保存中…', isEdit ? '保存' : '添加');
     }
   });
 }
@@ -272,10 +370,4 @@ export function openPhotoSheet({ onDone } = {}) {
       setBusy(button, false, '处理中…', '加入相册');
     }
   });
-}
-
-function escapeHtml(value) {
-  return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
 }

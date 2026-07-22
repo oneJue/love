@@ -57,38 +57,9 @@ export async function getBlob(storeKey) {
   return rec ? rec.blob : null;
 }
 
-/** 取缩略图 dataURL（entry.attachments 已含 thumb，无需进 IDB；此处兜底） */
-export async function getThumb(meta) {
-  if (meta && meta.thumb) return meta.thumb;
-  if (meta && meta.storeKey && meta.type && meta.type.startsWith('image/')) {
-    const blob = await getBlob(meta.storeKey);
-    if (blob) return await makeThumb(blob).catch(() => null);
-  }
-  return null;
-}
-
 /** 删除条目的一个附件 blob；元数据由 store.removeAttachment 清理 */
 export async function deleteBlob(storeKey) {
   try { await idbDelete(storeKey); } catch (_) {}
-}
-
-/** 列出 IDB 中全部 {id}（用于孤儿清理 / 审计） */
-export async function listAllIds() {
-  const store = await tx('readonly');
-  return new Promise((resolve, reject) => {
-    const req = store.getAllKeys();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-/** 删除未被任何 entry 引用的孤儿 blob（传入仍在用的 storeKey 集合） */
-export async function gcKeep(usedKeys) {
-  const all = await listAllIds();
-  const keep = new Set(usedKeys.map(String));
-  for (const id of all) {
-    if (!keep.has(String(id))) await idbDelete(id);
-  }
 }
 
 // —— 导出/导入：把 blob 编码 base64 一起打包，换设备可迁移 ——

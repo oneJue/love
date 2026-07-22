@@ -36,7 +36,6 @@ export function makeEntry({ title, occurrenceDate, raisedBy, severity = '一般'
     resolutionDate: null,
     shelvedReason: null,
     shelvedFrom: null,
-    gentleReview: false,
     history: [{ at: now, by: raisedBy || '男方', summary: '创建条目' }],
   };
 }
@@ -93,29 +92,19 @@ export function migrateEntry(entry) {
   entry.maleNote = entry.maleNote || tpl.maleNote;
   entry.femaleNote = entry.femaleNote || tpl.femaleNote;
   entry.agreement = entry.agreement || tpl.agreement;
-  entry.history = Array.isArray(entry.history) ? entry.history : tpl.history;
+  // R2-6 (L5 防御): 旧版残留 history 为非数组（null/字符串/undefined）时不要套 tpl.history
+  // （那会注入一条 at=now 的虚假"创建条目"留痕，违背留痕真实承诺）。
+  // 回退为空数组；若残留了非数组数据，记一条 sys 迁移留痕保留可追溯性而非静默吞掉。
+  if (Array.isArray(entry.history)) {
+    // 已是数组，保留
+  } else if (entry.history == null) {
+    entry.history = [];
+  } else {
+    entry.history = [{ at: new Date().toISOString(), by: 'sys', summary: '数据迁移: 历史留痕已规整' }];
+  }
   entry.shelvedReason = entry.shelvedReason != null ? entry.shelvedReason : null;
   entry.shelvedFrom = entry.shelvedFrom != null ? entry.shelvedFrom : null;
   // 修复 INV-1 脏 status：存储的 status 必须等于派生值
   entry.status = computeStatus(entry);
   return entry;
-}
-
-/** 默认空 LoveData 顶层容器 */
-export function emptyLoveData() {
-  return {
-    updatedAt: new Date().toISOString().slice(0, 10),
-    meta: {
-      startDate: null,
-      anniversaryName: '在一起',
-      partnerNames: { male: '他', female: '她' },
-      timezone: 'Asia/Shanghai',
-    },
-    entries: [],
-    anniversaries: [],
-    photos: [],
-    albums: [],
-    timeline: [],
-    messages: [],
-  };
 }

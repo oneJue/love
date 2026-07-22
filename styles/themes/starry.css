@@ -9,7 +9,8 @@
   --card-2: rgba(55, 50, 90, .6);
   --ink: #E8E6F5;
   --muted: #9B96C4;
-  --faint: #6E6A99;
+  --faint: #9D97C0;   /* R2-1 WCAG AA: 半透明卡片合成底 #1f1d3a on card ≈ 5.88:1（原 #6E6A99 仅 3.23）。
+                          R3 M2: card-2 合成底(≈#29384a)上原 #958FB8 仅 4.72 裕量偏紧，提亮到 #9D97C0 → 5.21:1 */
   --line: rgba(201, 184, 255, .18);
   --line-dashed: 1px dashed rgba(201, 184, 255, .25);
 
@@ -22,13 +23,22 @@
   --ok: #8FE6A8;           --ok-bg: rgba(143, 230, 168, .18);     --ok-ink: #8FE6A8;
   --hold: #9B96C4;         --hold-bg: rgba(155, 150, 196, .16);   --hold-ink: #9B96C4;
 
+  /* R3: --danger 覆盖——tokens 默认 #c0564a 在玻璃卡合成底(card-2 合成 #292647 ≈)上仅 3.19:1 不达 AA，
+     提亮到 #E89284（card-2 合成底上 6.07:1）。editor.css 危险操作/错误文案在星空主题现在可读。 */
+  --danger: #E89284;
+  --danger-soft: rgba(232, 146, 132, .30);
+
   --tape: rgba(230, 195, 126, .35);
   --tape-edge: rgba(230, 195, 126, .1);
 
-  --ff-title: "Ma Shan Zheng", "Caveat", cursive;
+  --ff-title: "Noto Serif SC", "Songti SC", serif;   /* R2-2: Caveat 未在 index.html 加载是死引用；Ma Shan Zheng 粗笔书法在玻璃卡上过粗，改优雅衬线 */
 
   --sh-card: 0 4px 24px rgba(127, 212, 232, .08);
   --sh-sticky: 0 8px 30px rgba(201, 184, 255, .15);
+
+  /* R2-7: 主题主色阴影——月光蓝调，与玻璃卡调色板一致 */
+  --sh-accent: rgba(127, 212, 232, .16);
+  --sh-accent-strong: rgba(201, 184, 255, .30);
 }
 [data-theme="starry"] body {
   background-image:
@@ -46,3 +56,8 @@
   -webkit-backdrop-filter: blur(6px);
 }
 [data-theme="starry"] .tabbar { background: rgba(20, 19, 43, .85); backdrop-filter: blur(8px); }
+/* R2-2: 星空主题标题用衬线优雅字体，加细微字距营造静谧感 */
+[data-theme="starry"] .days-display strong,
+[data-theme="starry"] .modal h3,
+[data-theme="starry"] .home-hero h2,
+[data-theme="starry"] .polaroid .cap { letter-spacing: 0.02em; }

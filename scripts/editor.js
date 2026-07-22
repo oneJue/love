@@ -8,12 +8,7 @@
 import * as store from './store.js';
 import { sideLabel } from './schema.js';
 import * as att from './attachments.js';
-
-const T = {
-  backTitle: '补充视角',
-  agreeTitle: '我们的约定',
-  noteTitle: '想说的话',
-};
+import { escapeHtml, sameId } from './util.js';
 
 let dialogId = 0;
 
@@ -77,12 +72,6 @@ function openMask(className, innerHTML, onClose) {
   return activateDialog(mask, onClose);
 }
 
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
-
 // —— 新建条目 sheet ——
 export function openAddSheet({ onDone } = {}) {
   const meSide = store.getMeSide();
@@ -104,9 +93,9 @@ export function openAddSheet({ onDone } = {}) {
         <div>
           <label>严重度</label>
           <div class="seg" data-seg="severity">
-            <button data-v="小事" type="button">小</button>
+            <button data-v="小事" type="button">小事</button>
             <button data-v="一般" class="active" type="button">一般</button>
-            <button data-v="重要" type="button">大</button>
+            <button data-v="重要" type="button">重要</button>
           </div>
         </div>
       </div>
@@ -136,10 +125,10 @@ export function openAddSheet({ onDone } = {}) {
         <textarea data-k="viewOther" rows="3" placeholder="代 TA 把 TA 的视角也写上"></textarea>
       </div>
       <p class="single-hint">单机模拟：提交后以"${label}"身份记下。要让对方补充视角，去右上角头像切换身份。</p>
-      <div class="inline-error" id="add-err"></div>
+      <div class="inline-error" id="add-err" role="alert"></div>
       <div class="btns">
         <button type="button" id="add-cancel">取消</button>
-        <button type="button" class="primary" id="add-save">记下来</button>
+        <button type="button" class="primary" id="add-save">记一笔</button>
       </div>
     </div>`);
 
@@ -162,7 +151,7 @@ export function openAddSheet({ onDone } = {}) {
       const url = URL.createObjectURL(f);
       const chip = document.createElement('div');
       chip.className = 'attach-chip';
-      chip.innerHTML = `<img src="${url}" alt=""><span>${esc(f.name)}</span><button type="button">×</button>`;
+      chip.innerHTML = `<img src="${url}" alt=""><span>${escapeHtml(f.name)}</span><button type="button">×</button>`;
       chip.querySelector('button').addEventListener('click', () => {
         const i = pendingFiles.indexOf(f); if (i >= 0) pendingFiles.splice(i, 1);
         URL.revokeObjectURL(url); chip.remove();
@@ -187,24 +176,26 @@ export function openAddSheet({ onDone } = {}) {
     if (!view && !(coLocated && viewOther) && !description) { errEl.textContent = '至少写事件描述或一方视角'; return; }
     if (coLocated && !viewOther) { errEl.textContent = '勾选了一起记，请把对方视角也填上'; return; }
     const btn = mask.querySelector('#add-save');
-    btn.disabled = true; btn.textContent = '记下中…';
+    btn.disabled = true; btn.textContent = '记一笔中…';
     try {
       const entry = await store.createEntry({ title, occurrenceDate, severity, description, view, coLocated, viewOther });
-      // 提交后落附件到 IDB 并写入元数据
+      // 提交后落附件到 IDB 并写入元数据；收集实际落盘的 meta，撤回时按它清理 blob
+      const savedMetas = [];
       for (const f of pendingFiles) {
         try {
           const meta = await att.putAttachment(f);
           await store.addAttachment(entry.id, meSide, meta);
+          savedMetas.push(meta);
         } catch (err) { console.error('附件保存失败', f.name, err); }
       }
       mask._close();
-      toast('记下来了', { duration: 5000, onUndo: () => store.deleteEntryIfFresh(entry.id).then(() => {
-        // 撤回时清理刚落的附件 blob
-        entry.attachments.forEach(a => att.deleteBlob(a.storeKey));
-      }).catch(() => {}) });
+      toast('已记一笔', { duration: 5000, onUndo: () => store.deleteEntryIfFresh(entry.id).then(() => {
+        // 撤回时清理刚落的附件 blob（createEntry 返回的 entry.attachments 是初始空数组，故用 savedMetas）
+        savedMetas.forEach(m => att.deleteBlob(m.storeKey));
+      }).catch(err => toast('撤回失败：' + err.message, { duration: 6000 })) });
       onDone && onDone(entry);
     } catch (err) {
-      errEl.textContent = err.message; btn.disabled = false; btn.textContent = '记下来';
+      errEl.textContent = err.message; btn.disabled = false; btn.textContent = '记一笔';
     }
   });
 }
@@ -216,10 +207,10 @@ export function openFactSheet({ entry, meSide, onDone }) {
   const mask = openMask('', `
     <div class="modal">
       <h3>补事实层（任一方可写）</h3>
-      <p class="sub-hint">「${esc(entry.title)}」· 客观发生了什么，不带情绪。</p>
+      <p class="sub-hint">「${escapeHtml(entry.title)}」· 客观发生了什么，不带情绪。</p>
       <div class="field">
         <label>事件描述</label>
-        <textarea id="fs-desc" rows="4" placeholder="客观写下发生了什么">${esc(desc.text || '')}</textarea>
+        <textarea id="fs-desc" rows="4" placeholder="客观写下发生了什么">${escapeHtml(desc.text || '')}</textarea>
       </div>
       <div class="field">
         <label>背景附件</label>
@@ -244,7 +235,7 @@ export function openFactSheet({ entry, meSide, onDone }) {
       const url = URL.createObjectURL(f);
       const chip = document.createElement('div');
       chip.className = 'attach-chip';
-      chip.innerHTML = `<img src="${url}" alt=""><span>${esc(f.name)}</span><button type="button">×</button>`;
+      chip.innerHTML = `<img src="${url}" alt=""><span>${escapeHtml(f.name)}</span><button type="button">×</button>`;
       chip.querySelector('button').addEventListener('click', () => {
         const i = pendingFiles.indexOf(f); if (i >= 0) pendingFiles.splice(i, 1);
         URL.revokeObjectURL(url); chip.remove();
@@ -257,7 +248,7 @@ export function openFactSheet({ entry, meSide, onDone }) {
     button.addEventListener('click', async () => {
       const attId = button.dataset.del;
       const current = store.getEntry(entry.id);
-      const meta = current && (current.attachments || []).find(item => String(item.id) === String(attId));
+      const meta = current && (current.attachments || []).find(item => sameId(item.id, attId));
       button.disabled = true;
       try {
         if (meta) await att.deleteBlob(meta.storeKey);
@@ -303,9 +294,9 @@ export function openViewSheet({ entry, meSide, onDone }) {
   const mask = openMask('', `
     <div class="modal">
       <h3>${existing ? '修改我的视角' : '补充我的视角'}（${label}）</h3>
-      <p class="sub-hint">「${esc(entry.title)}」</p>
+      <p class="sub-hint">「${escapeHtml(entry.title)}」</p>
       <div class="field">
-        <textarea id="vs-text" rows="6" placeholder="写下你眼里发生了什么、你的感受">${esc(view.text || '')}</textarea>
+        <textarea id="vs-text" rows="6" placeholder="写下你眼里发生了什么、你的感受">${escapeHtml(view.text || '')}</textarea>
       </div>
       <p class="single-hint">单机模拟：仅以${label}身份写入这一侧。</p>
       <div class="btns">
@@ -337,15 +328,15 @@ export function openAgreementSheet({ entry, meSide, edit, onDone }) {
       <p class="sub-hint">约定是两人中立达成的内容，任一方可写。修改会让双方确认自动重置。</p>
       <div class="field">
         <label>我们的约定</label>
-        <textarea id="ag-text" rows="4" placeholder="我们要一起达成的事，比如：…">${esc(agreement.text || '')}</textarea>
+        <textarea id="ag-text" rows="4" placeholder="我们要一起达成的事，比如：…">${escapeHtml(agreement.text || '')}</textarea>
       </div>
       <div class="field">
         <label>我（${label}）想说的话（可选）</label>
-        <textarea id="ag-note" rows="2" placeholder="道歉、接纳、补充都行">${esc(myNote.text || '')}</textarea>
+        <textarea id="ag-note" rows="2" placeholder="道歉、接纳、补充都行">${escapeHtml(myNote.text || '')}</textarea>
       </div>
       <div class="field">
         <label>${otherLabel}想说的话</label>
-        <textarea rows="2" disabled placeholder="${otherNote.text ? esc(otherNote.text) : '对方会在这里补充'}"></textarea>
+        <textarea rows="2" disabled placeholder="${otherNote.text ? escapeHtml(otherNote.text) : '对方会在这里补充'}"></textarea>
       </div>
       <div class="btns">
         <button type="button" id="ag-cancel">取消</button>
@@ -373,7 +364,7 @@ export function openNoteSheet({ entry, meSide, onDone }) {
     <div class="modal">
       <h3>修改我说的话（${label}）</h3>
       <div class="field">
-        <textarea id="nt-text" rows="4" placeholder="道歉、接纳、补充…">${esc(note.text || '')}</textarea>
+        <textarea id="nt-text" rows="4" placeholder="道歉、接纳、补充…">${escapeHtml(note.text || '')}</textarea>
       </div>
       <div class="btns">
         <button type="button" id="nt-cancel">取消</button>
@@ -393,12 +384,12 @@ export function openNoteSheet({ entry, meSide, onDone }) {
 export function openGuardSheet({ title, hint, requireReason = false, reasonPlaceholder = '', confirmText = '确认', danger = false, onConfirm }) {
   const mask = openMask('', `
     <div class="modal">
-      <h3>${esc(title)}</h3>
-      ${hint ? `<p class="sub-hint">${esc(hint)}</p>` : ''}
-      ${requireReason ? `<div class="field"><textarea id="gd-reason" rows="2" placeholder="${esc(reasonPlaceholder)}"></textarea></div>` : ''}
+      <h3>${escapeHtml(title)}</h3>
+      ${hint ? `<p class="sub-hint">${escapeHtml(hint)}</p>` : ''}
+      ${requireReason ? `<div class="field"><textarea id="gd-reason" rows="2" placeholder="${escapeHtml(reasonPlaceholder)}"></textarea></div>` : ''}
       <div class="btns">
         <button type="button" id="gd-cancel">取消</button>
-        <button type="button" class="${danger ? 'danger' : 'primary'}" id="gd-go" disabled>${esc(confirmText)}</button>
+        <button type="button" class="${danger ? 'danger' : 'primary'}" id="gd-go" disabled>${escapeHtml(confirmText)}</button>
       </div>
     </div>`);
   const goBtn = mask.querySelector('#gd-go');
@@ -425,7 +416,7 @@ export function toast(text, { soft = false, duration = 4000, onUndo = null } = {
   el.className = `toast ${soft ? 'soft' : ''}`;
   el.setAttribute('role', soft ? 'status' : 'alert');
   el.setAttribute('aria-live', soft ? 'polite' : 'assertive');
-  el.innerHTML = `<span class="t-text">${esc(text)}</span>${onUndo ? '<button class="undo-btn">撤回</button>' : ''}<button class="t-close" aria-label="关闭">×</button>`;
+  el.innerHTML = `<span class="t-text">${escapeHtml(text)}</span>${onUndo ? '<button type="button" class="undo-btn">撤回</button>' : ''}<button type="button" class="t-close" aria-label="关闭">×</button>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   const dismiss = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 200); };

@@ -66,8 +66,3 @@ export function prettyDate(dateStr) {
   if (!d) return dateStr || '';
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
-
-/** 目前的 ISO 时间戳（带时分），静态版用 new Date()，Phase 2 后端会传服务端时间 */
-export function nowISO() {
-  return new Date().toISOString();
-}

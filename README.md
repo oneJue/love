@@ -6,13 +6,13 @@
 
 ## 当前版本
 
-Phase 1+：本地优先交互版（零依赖、零后端）。沟通簿、时光、相册和留言均可在页面内直接新增；沟通簿支持提出事件、写/改双方视角、起草约定、双方确认、归档和解、搁置/重新激活/重新打开。结构化数据写在 localStorage，照片原图写在 IndexedDB，单机内切身份模拟两人。
+Phase 1+：本地优先交互版。沟通簿、时光、相册和留言均可在页面内直接新增；沟通簿支持提出事件、写/改双方视角、起草约定、双方确认、归档和解、搁置/重新激活/重新打开。结构化数据写在 localStorage，照片原图写在 IndexedDB，单机内切身份模拟两人。
 
-> 真正两人各自从手机在线写入是 Phase 2（SQLite 后端）的事；store 层已抽象好，切换时客户端零重写。
+Phase 2 本机后端已就绪（M1+M3）：`server/` 下 Node Express + better-sqlite3 + SSE，URL 带 `cloud=1` 即切 httpBackend（fetch `/api/data` + 订阅 `/api/events` 实时刷新），客户端渲染层零重写。当前后端无鉴权（本机双人同浏览器 / 跨标签模拟），身份校验、单人单写等留作后续 milestone。
 
 ## 沟通簿交互（怎么用）
 
-1. **提出事件**：沟通簿 tab 右下角「+」→ 填标题/日期/严重度/**事实层（事件描述 + 背景图片）**/我的视角 →「记下来」。只有自己一侧视角时状态是「待沟通」。
+1. **提出事件**：沟通簿 tab 右下角「+」→ 填标题/日期/严重度/**事实层（事件描述 + 背景图片）**/我的视角 →「记一笔」。只有自己一侧视角时状态是「待沟通」。
 2. **事实层（任一方可补/改）**：客观"发生了什么"写描述，可附聊天截图等背景（图片存 IndexedDB，背景参考定位，不是对质证据）。条目上「事实层」按钮随时补。
 3. **写对方视角**：右上头像切到对方身份 → 条目上「补充我的视角」。（单机模拟，界面上有"当前以 X 身份"明示）
 4. **起草约定**：双方视角齐全后，「起草约定」亮起；填共同约定 + 各自想说的话 → 保存，进「待确认」。
@@ -29,9 +29,10 @@ Phase 1+：本地优先交互版（零依赖、零后端）。沟通簿、时光
 
 ## 时光、相册与留言
 
-- **时光**：进入「时光 → 时间线」，点击「记录时光」，填写日期、类型、标题和细节；最新一条会同步到首页。
-- **相册**：进入「时光 → 相册」，从设备选择照片并填写日期、说明。原图只保存在本地，导出备份时会与沟通簿附件一起打包。
-- **留言**：进入「留言」直接写给对方或写给两个人，可选择心情和置顶。未读状态按当前男方/女方身份分别记录。
+- **时光**：进入「时光 → 时间线」，点击「记录时光」，填写日期、类型、标题和细节；最新一条会同步到首页。可在顶部按**类型 + 年份筛选**；切走再回来，筛选自动重置为「全部」。
+- **相册**：进入「时光 → 相册」，从设备选择照片并填写日期、说明。原图只保存在本地，导出备份时会与沟通簿附件一起打包。点开照片进**全屏查看**，支持左右切换按钮、`←` `→` 键盘和左右滑动手势，损坏的原图自动切占位提示。
+- **留言**：进入「留言」直接写给对方或写给两个人，可选择心情和置顶。点「置顶/取消置顶」可随时切换，置顶卡片有醒目底色浮起；未读状态按当前男方/女方身份分别记录。
+- **首页统计**：首页有沟通簿/时光/留言三项的数盘 tile，点击可跳转对应视图。
 
 ## 测试
 
@@ -39,14 +40,19 @@ Phase 1+：本地优先交互版（零依赖、零后端）。沟通簿、时光
 node --test test/interaction.test.js    # 38 条：状态机 + DOM id 兼容 + store 权限 + 关系日期 + 时光/留言/相册 + 不变量
 node --test test/render-smoke.test.js   # 5 条：渲染层 smoke（种子加载/样例卡/事实层/无"同意"/全流程流转）
 node --test test/ui-quality.test.js     # 7 条：首页日期入口 + 沟通上下文/模式联动 + 导航语义 + 弹窗键盘操作
+node --test test/e2e-cloud.test.js      # 1 条：云端模式 e2e（需后端在跑：cd server && npm start，再 ?cloud=1）
 ```
+
+合计 51/51 全绿（前 3 个文件 50 条可离线跑，e2e-cloud 需启动后端）。
 
 ## 目录
 
 ```
 love/
 ├── index.html              入口（4 tab）
-├── data.json               schema v2 数据（改内容只动这个文件）
+├── data.json               公开种子（示例数据；本地真实数据不写回此文件，见下）
+├── data.seed.json          种子源（与 data.json 同步的干净兜底）
+├── data.local.json         本地真实运行态（.gitignore 忽略，不入库）
 ├── data.legacy.json        旧 schema 备份（只读，迁移留痕）
 ├── README.md               本文件
 ├── assets/
@@ -55,30 +61,53 @@ love/
 ├── styles/
 │   ├── tokens.css          设计令牌（手账风默认）
 │   ├── base.css            通用组件样式
+│   ├── editor.css          表单 sheet / toast / 二次确认 / 开关样式
 │   └── themes/             4 套主题：scrapbook/minimal/starry/kawaii
-└── scripts/
-    ├── app.js              入口：tab 路由 / 主题 / 身份 / 首页聚合
-    ├── comm-book.js        沟通簿（5 态筛选 + 详情）
-    ├── days-together.js    在一起天数
-    ├── timeline.js         时光时间线
-    ├── photo-wall.js       照片墙
-    ├── messages.js         留言
-    ├── memory-editor.js    时光 / 留言 / 相册创作表单
-    ├── status-machine.js   5 态状态机（唯一真相源）
-    ├── date-math.js        日期工具
-    ├── schema.js           schema v2 工厂
-    └── store.js            数据层（Phase 2 换 fetch /api）
+├── scripts/
+│   ├── app.js              入口：tab 路由 / 主题 / 身份 / 首页聚合
+│   ├── comm-book.js        沟通簿（5 态筛选 + 详情）
+│   ├── days-together.js    在一起天数
+│   ├── timeline.js         时光时间线（含类型/年份筛选）
+│   ├── photo-wall.js       照片墙（全屏查看 + 左右切换）
+│   ├── messages.js         留言（置顶 + 未读）
+│   ├── memory-editor.js    时光 / 留言 / 相册 / 纪念日 创作表单
+│   ├── editor.js           弹窗 sheet / toast / 二次确认 基础设施（被多处 import）
+│   ├── attachments.js      附件存储层（IndexedDB；图片缩略图 + 导出打包）
+│   ├── httpBackend.js      Phase 2 fetch /api + SSE 注入（store.cloud=1 时启用）
+│   ├── status-machine.js   5 态状态机（唯一真相源）
+│   ├── date-math.js        日期工具
+│   ├── schema.js           schema v2 工厂
+│   └── store.js            数据层（localStorageBackend ↔ httpBackend，切换零重写）
+└── server/                 Phase 2 本机后端（M1+M3）
+    ├── index.js            Express 入口（GET/PUT /api/data + SSE）
+    ├── db.js               better-sqlite3 读写（server/data/love.db）
+    ├── sse.js              /api/events 实时广播 + 心跳
+    └── package.json        love-server（express / cors / better-sqlite3）
 ```
 
 ## 怎么打开
 
 页面用 `fetch` 读 `data.json`，**不能直接双击** index.html（浏览器安全策略会拦截本地文件 fetch）。
 
+**单机模式**（localStorage，默认）：
+
 ```bash
-cd love
 python3 -m http.server 8000          # 注意是 -m，缺了会失败
 # 浏览器开 http://localhost:8000
 ```
+
+**云端模式**（两人共享，URL 带 cloud=1）：
+
+另起一个终端跑后端，再开前端时 URL 带 `?cloud=1`，store 会切到 httpBackend（fetch `/api/data` + 订阅 `/api/events` SSE 实时刷新）：
+
+```bash
+cd server && npm install && npm start   # 后端默认 http://localhost:3000
+# 另一个终端：
+python3 -m http.server 8000            # 前端
+# 浏览器开 http://localhost:8000/?cloud=1
+```
+
+当前后端无鉴权，属本机双人/跨标签模拟；真正的单人单写鉴权是后续 milestone。
 
 ## 沟通簿记录结构（schema v2）
 
@@ -105,7 +134,6 @@ python3 -m http.server 8000          # 注意是 -m，缺了会失败
   "status": "待沟通",
   "resolutionDate": null,
   "shelvedReason": null, "shelvedFrom": null,
-  "gentleReview": false,
   "history": []
 }
 ```
@@ -147,6 +175,10 @@ python3 -m http.server 8000          # 注意是 -m，缺了会失败
 
 首页点击「填写开始日期」或关系概览右上角编辑按钮，可设置开始日期、双方称呼和关系称呼。保存后首页立即计算在一起天数，无需手动修改 `data.json`。
 
-## 何时切到 Phase 2 后端
+## Phase 2 后端
 
-当单机切身份模拟两人开始不便、或想要两人各自从手机实时在线写入时，升级 Phase 2：本地 SQLite（`./data/love.db`）+ Flask + 双账号 bcrypt。客户端只需把 `store.js` 的 `localStorageBackend` 换成 `httpBackend`（fetch /api），渲染逻辑零重写。后端会强制：男方改不了女方视角/附言/确认，状态机服务端派生。详见计划文件。
+当单机切身份模拟两人开始不便、或想要两人各自从手机实时在线写入时，用本机后端。已实现（M1+M3）：Node Express + better-sqlite3（`server/data/love.db`）+ SSE 实时广播（`/api/events`）。客户端只需 URL 带 `cloud=1`，`store.js` 自动从 `localStorageBackend` 切到 `httpBackend`（fetch `/api/data` + 订阅 SSE），渲染逻辑零重写。后端在 PUT 时做一次 `migrateEntry` + `computeStatus` 派生兜底（INV-1）。**当前无鉴权**——身份仍是客户端标记；真正的单人单写、男/女方写权限强制是后续 milestone。
+
+## 关于种子文件
+
+仓库内 `data.json` / `data.seed.json` 是**公开干净种子**（仅示例条目），本地真实数据落在 `data.local.json`（localStorage 单机）或 `server/data/love.db`（云端），**不会写回 data.json**。克隆后请勿往 `data.json` 填真实沟通记录并提交——隐私内容只留在自己的浏览器/本地库。`data.local.json` 已在 `.gitignore` 中忽略。

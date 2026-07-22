@@ -1,8 +1,7 @@
 // =========================================================================
 // app.js — 应用入口：4 tab 装载 + 路由 + 主题/身份切换 + 首页聚合
 // =========================================================================
-import { load, getMeSide, setMeSide, onStoreChanged } from './store.js';
-import { computeStatus, pendingAction } from './status-machine.js';
+import { pendingAction } from './status-machine.js';
 import { daysUntil, humanizeDays, prettyDate } from './date-math.js';
 import * as daysTogether from './days-together.js';
 import * as commBook from './comm-book.js';
@@ -11,6 +10,7 @@ import * as photoWall from './photo-wall.js';
 import * as messages from './messages.js';
 import * as editor from './editor.js';
 import * as memoryEditor from './memory-editor.js';
+import { escapeHtml } from './util.js';
 import * as store from './store.js';
 import { sideLabel } from './schema.js';
 
@@ -28,7 +28,7 @@ let tlSubtab = 'timeline'; // timeline | album
 
 async function boot() {
   restoreTheme();
-  try { data = await load(); }
+  try { data = await store.load(); }
   catch (e) {
     document.getElementById('app').innerHTML = `<div class="empty">无法加载数据：${escapeHtml(e.message)}<br>请用 <code>python3 -m http.server 8000</code> 启动后访问 http://localhost:8000</div>`;
     return;
@@ -36,12 +36,12 @@ async function boot() {
   renderShell();
   renderTab();
   // 首页状态条随 store 变化刷新
-  onStoreChanged(() => { if (activeTab === 'home') renderHome(); });
+  store.onStoreChanged(() => { if (activeTab === 'home') renderHome(); });
 }
 
 function renderShell() {
   const app = document.getElementById('app');
-  const meSide = getMeSide();
+  const meSide = store.getMeSide();
   app.innerHTML = `
     <button type="button" class="avatar" id="avatar" aria-label="打开设置，当前身份：${sideLabel(meSide)}" title="设置 / 身份 / 主题">
       <span class="dot ${meSide}" aria-hidden="true"></span>
@@ -94,9 +94,29 @@ function renderTab() {
   else if (activeTab === 'message') messages.mount(document.getElementById('view-message'));
 }
 
+function renderHomeStats(liveData) {
+  const counts = {
+    comm: (liveData.entries || []).length,
+    tl: (liveData.timeline || []).length,
+    photo: (liveData.photos || []).length,
+    msg: (liveData.messages || []).length,
+  };
+  const tiles = [
+    { n: counts.comm, label: '件沟通', goto: 'comm' },
+    { n: counts.tl, label: '段时光', goto: 'timeline' },
+    { n: counts.photo, label: '张照片', goto: 'album' },
+    { n: counts.msg, label: '封留言', goto: 'message' },
+  ];
+  return `<section class="home-stats" aria-label="一起记录的总量">
+    ${tiles.map(t => `<button type="button" class="home-stat" data-stat-go="${t.goto}">
+      <strong>${t.n}</strong><small>${t.label}</small>
+    </button>`).join('')}
+  </section>`;
+}
+
 function renderHome() {
   const el = document.getElementById('view-home');
-  const liveData = (() => { try { return JSON.parse(localStorage.getItem('love:data')) || data; } catch { return data; } })();
+  const liveData = store.getCachedSync() || data;
   daysTogether.mount(el, liveData, {
     onEdit: () => memoryEditor.openRelationshipSheet({
       data: liveData,
@@ -116,11 +136,23 @@ function renderHome() {
       <button type="button" data-home-action="message"><span aria-hidden="true">✉</span><strong>写留言</strong><small>留给彼此</small></button>
     </div>`);
 
-  // 纪念日倒计时
+  // R3 F3: 一起记录的总量统计——纯展示聚合，不写 store 不碰 schema
+  el.insertAdjacentHTML('beforeend', renderHomeStats(liveData));
+
+  // 纪念日倒计时——R3-issue5: 「管理」入口独立于 anns 渲染，anniversaries 为空或全部过期时也常驻。
   const anns = (liveData.anniversaries || [])
     .map(a => ({ ...a, days: daysUntil(a.date, a.recurring === '每年') }))
     .filter(a => a.days !== null && a.days >= 0)
     .sort((a, b) => a.days - b.days);
+  const manageAnniversaries = () => memoryEditor.openRelationshipSheet({
+    data: liveData,
+    onDone: async () => {
+      data = await store.load();
+      renderShell();
+      renderTab();
+      document.querySelector('[data-edit-anniversaries]')?.focus();
+    },
+  });
   if (anns.length) {
     const a = anns[0];
     el.insertAdjacentHTML('beforeend', `
@@ -128,10 +160,20 @@ function renderHome() {
         <span>下一个纪念日</span>
         <strong>${escapeHtml(a.title)}</strong>
         <em>${humanizeDays(a.days)}</em>
+        <button type="button" class="home-milestone-manage" data-edit-anniversaries aria-label="管理纪念日" title="管理纪念日">管理</button>
+      </section>`);
+  } else {
+    el.insertAdjacentHTML('beforeend', `
+      <section class="home-milestone home-milestone-empty">
+        <span>还没有纪念日</span>
+        <strong>添加一个值得记的日子</strong>
+        <em>第一次见面 · 在一起那天 · 生日…</em>
+        <button type="button" class="home-milestone-manage" data-edit-anniversaries aria-label="添加或管理纪念日" title="添加或管理纪念日">管理</button>
       </section>`);
   }
+  el.querySelector('[data-edit-anniversaries]')?.addEventListener('click', manageAnniversaries);
 
-  const meSide = getMeSide();
+  const meSide = store.getMeSide();
   const entries = liveData.entries || [];
   const open = entries
     .map(e => ({ e, act: pendingAction(e, meSide) }))
@@ -201,6 +243,17 @@ function renderHome() {
   el.querySelector('[data-home-action="message"]').addEventListener('click', () => {
     memoryEditor.openMessageSheet({ onDone: () => { activeTab = 'message'; renderTab(); } });
   });
+
+  // R3 F3: 统计 tile 跳转——comm→沟通簿、timeline/album→时光（相册/时间线）、message→留言
+  el.querySelectorAll('[data-stat-go]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const go = btn.dataset.statGo;
+      if (go === 'comm') { activeTab = 'comm'; renderTab(); }
+      else if (go === 'message') { activeTab = 'message'; renderTab(); }
+      else if (go === 'timeline') { activeTab = 'timeline'; tlSubtab = 'timeline'; renderTab(); }
+      else if (go === 'album') { activeTab = 'timeline'; tlSubtab = 'album'; renderTab(); }
+    });
+  });
 }
 
 function renderTimeline() {
@@ -224,7 +277,7 @@ function renderTimeline() {
 
 // —— 设置 modal：身份 / 主题 / 备份 ——
 function openSettings() {
-  const meSide = getMeSide();
+  const meSide = store.getMeSide();
   const curTheme = localStorage.getItem('love:theme') || 'scrapbook';
   const mask = document.createElement('div');
   mask.className = 'modal-mask';
@@ -234,20 +287,20 @@ function openSettings() {
       <p class="single-hint" style="margin-bottom:12px">⚠ 单机模拟：身份切换仅本地标记。同一浏览器切换身份=模拟对方视角，不等同对方真的在场。</p>
       <p style="color:var(--muted);font-size:13px;margin-bottom:8px">当前身份</p>
       <div class="subtabs" style="margin-bottom:16px">
-        <button data-side="male" aria-pressed="${meSide==='male'}" class="${meSide==='male'?'active':''}">我是男方</button>
-        <button data-side="female" aria-pressed="${meSide==='female'}" class="${meSide==='female'?'active':''}">我是女方</button>
+        <button type="button" data-side="male" aria-pressed="${meSide==='male'}" class="${meSide==='male'?'active':''}">我是男方</button>
+        <button type="button" data-side="female" aria-pressed="${meSide==='female'}" class="${meSide==='female'?'active':''}">我是女方</button>
       </div>
       <p style="color:var(--muted);font-size:13px;margin-bottom:8px">主题</p>
       <div class="subtabs" style="margin-bottom:16px">${THEMES.map(t =>
-        `<button data-theme="${t}" aria-pressed="${curTheme===t}" class="${curTheme===t?'active':''}">${themeName(t)}</button>`).join('')}</div>
+        `<button type="button" data-theme="${t}" aria-pressed="${curTheme===t}" class="${curTheme===t?'active':''}">${themeName(t)}</button>`).join('')}</div>
       <p style="color:var(--muted);font-size:13px;margin-bottom:8px">数据备份（本地存储）</p>
       <div class="btns" style="justify-content:flex-start;margin-top:0;margin-bottom:8px">
-        <button id="bk-export">导出备份</button>
-        <button id="bk-import">导入备份</button>
-        <button id="bk-reset" class="danger">重置为种子</button>
+        <button type="button" id="bk-export">导出备份</button>
+        <button type="button" id="bk-import">导入备份</button>
+        <button type="button" id="bk-reset" class="danger">重置为种子</button>
       </div>
       <input type="file" id="bk-file" accept=".json,application/json" style="display:none" />
-      <div class="btns"><button class="primary" id="set-done">完成</button></div>
+      <div class="btns"><button type="button" class="primary" id="set-done">完成</button></div>
     </div>`;
   editor.activateDialog(mask, () => {
     renderShell();
@@ -256,7 +309,7 @@ function openSettings() {
   });
   mask.addEventListener('click', e => {
     const sb = e.target.closest('button[data-side]');
-    if (sb) { setMeSide(sb.dataset.side); mask.querySelectorAll('button[data-side]').forEach(x => {
+    if (sb) { store.setMeSide(sb.dataset.side); mask.querySelectorAll('button[data-side]').forEach(x => {
       x.classList.toggle('active', x === sb);
       x.setAttribute('aria-pressed', String(x === sb));
     }); }
@@ -334,12 +387,6 @@ function applyTheme(t) {
 }
 function restoreTheme() {
   applyTheme(localStorage.getItem('love:theme') || 'scrapbook');
-}
-
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
 }
 
 boot();

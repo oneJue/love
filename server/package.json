@@ -1,0 +1,16 @@
+{
+  "name": "love-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Love Book Phase 2 本机后端：单资源 API + SQLite",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.0"
+  }
+}

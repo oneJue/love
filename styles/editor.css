@@ -22,10 +22,15 @@
   padding: var(--s-2) var(--s-3); transition: border-color .15s;
   resize: vertical;
 }
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  outline: none; border-bottom-color: var(--m); border-bottom-width: 2.5px;
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  /* 键盘焦点：与 base.css 全局 :focus-visible 一致的强提示 outline（重新声明是为了
+     从源头保证即使 CSS 加载顺序调整也不丢失键盘可见焦点环，并显式抹掉下面 :focus 鼠标态
+     的 box-shadow 干扰，避免双环）。鼠标点击落在 :focus-visible 之外，仅走下面 :focus 的
+     border + box-shadow subtle 提示。 */
+  outline: 2px solid var(--m);
+  outline-offset: 2px;
   background: var(--card);
 }
 .field select { appearance: none; min-height: 44px; }
@@ -56,7 +61,7 @@
 /* —— 通用提示文字 —— */
 .sub-hint { color: var(--muted); font-size: 13px; margin-bottom: var(--s-3); }
 .single-hint { color: var(--faint); font-size: 12px; line-height: 1.6; margin-top: var(--s-2); }
-.inline-error { color: #c0564a; font-size: 13px; min-height: 18px; }
+.inline-error { color: var(--danger); font-size: 13px; min-height: 18px; }
 
 /* —— 身份明示戳 —— */
 .me-stamp {
@@ -99,7 +104,7 @@
 .action-btn:hover:not([disabled]) { border-color: var(--m); transform: translateY(-1px); }
 .action-btn.primary { background: var(--m); color: #fff; border-color: var(--m); }
 .action-btn.ghost { background: var(--card-2); color: var(--muted); }
-.action-btn.danger { background: var(--card-2); color: #c0564a; border-color: rgba(192,86,74,.3); }
+.action-btn.danger { background: var(--card-2); color: var(--danger); border-color: var(--danger-soft); }
 .action-btn[disabled] { opacity: .4; cursor: not-allowed; }
 .confirm-row .action-btn { margin-left: auto; }
 
@@ -152,7 +157,7 @@
 
 /* —— toast —— */
 .toast {
-  position: fixed; bottom: 100px; left: 50%; transform: translate(-50%, 20px);
+  position: fixed; bottom: calc(100px + env(safe-area-inset-bottom)); left: 50%; transform: translate(-50%, 20px);
   background: var(--card); color: var(--ink); padding: 10px 16px;
   border-radius: var(--r-pill); box-shadow: var(--sh-sticky);
   font-size: 14px; display: flex; align-items: center; gap: var(--s-3);
@@ -190,14 +195,16 @@
 .photo-preview img { display: block; width: 100%; max-height: 260px; object-fit: contain; }
 
 @media (max-width: 480px) {
-  .composer-sheet .field.row { flex-direction: column; gap: 0; }
+  /* R3 移动端：openAddSheet 渲染的容器是 .modal.add-sheet（非 composer-sheet），
+     其内日期+严重度 .field.row 在 375px 被压扁；与 composer-sheet 统一竖排。 */
+  .composer-sheet .field.row, .add-sheet .field.row { flex-direction: column; gap: 0; }
 }
 
 /* —— danger 按钮（modal 内）—— */
 .btns button.danger, .btns .danger {
-  background: var(--card-2); color: #c0564a; border: 1px solid rgba(192,86,74,.3);
+  background: var(--card-2); color: var(--danger); border: 1px solid var(--danger-soft);
 }
-.btns button.danger:hover { background: rgba(192,86,74,.1); }
+.btns button.danger:hover { background: var(--danger-soft); }
 
 /* —— 事实层（区分线 + 描述 + 附件网格）—— */
 .fact-divider {
@@ -209,7 +216,7 @@
   background: var(--card-2); border-radius: var(--r-sm);
   padding: var(--s-3) var(--s-4); margin-bottom: var(--s-3);
 }
-.fact-desc { font-size: 14px; color: var(--ink); white-space: pre-wrap; line-height: 1.75; opacity: .92; }
+.fact-desc { font-size: 14px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; opacity: .92; }
 .fact-empty { font-size: 13px; color: var(--muted); padding: var(--s-2) 0; margin-bottom: var(--s-3); }
 .link-btn { background: none; border: none; color: var(--m); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0; font-family: var(--ff-body); }
 
@@ -241,6 +248,22 @@
 .attach-chip span { max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attach-chip button { border: none; background: none; cursor: pointer; color: var(--faint); font-size: 15px; line-height: 1; padding: 0 4px; }
 .existing-attach { margin-top: var(--s-3); }
+
+/* —— 纪念日管理 chip（关系资料 sheet 内）—— */
+.anni-list { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-3); }
+.anni-chip {
+  display: flex; align-items: center; gap: var(--s-2); background: var(--card-2);
+  border-radius: var(--r-pill); padding: 6px 10px; font-size: 13px;
+}
+.anni-chip-name { font-weight: 600; color: var(--ink); }
+.anni-chip-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex: 1; min-width: 0; }
+.anni-chip-edit, .anni-chip-del {
+  border: none; background: none; cursor: pointer; color: var(--faint);
+  font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: var(--r-pill);
+  transition: color .12s, background .12s;
+}
+.anni-chip-edit:hover { color: var(--m); background: var(--m-soft); }
+.anni-chip-del:hover { color: var(--danger); background: var(--danger-soft); }
 
 /* —— lightbox —— */
 .lightbox-mask {
@@ -296,6 +319,33 @@
 .context-notes p { color: var(--muted); font-size: 12px; }
 .context-notes p + p { margin-top: var(--s-1); }
 .context-notes strong { color: var(--ink); }
+
+/* —— history 留痕时间线 —— */
+.entry-history { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px dashed var(--line); }
+.entry-history > summary {
+  cursor: pointer; font-size: 11px; color: var(--faint); list-style: none; user-select: none;
+}
+.entry-history > summary::-webkit-details-marker { display: none; }
+.entry-history > summary::before { content: "∘ "; color: var(--muted); }
+.entry-history[open] > summary::before { content: "∙ "; }
+/* R2-3: open-nudge 引导——comm 模式（非 review）有留痕时给 summary 一个温和主色圆点 + 提亮字色，
+   让"留痕·共 N 次"在折叠态下仍可感知（原 open-nudge 类零 CSS 是死类名） */
+.entry-history.open-nudge:not([open]) > summary { color: var(--muted); font-weight: 600; }
+.entry-history.open-nudge:not([open]) > summary::before {
+  content: "● "; color: var(--m); font-size: 9px; vertical-align: middle;
+}
+.hist-list { list-style: none; margin: var(--s-2) 0 0; padding: 0; }
+.hist-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); padding: var(--s-1) 0; font-size: 12px; line-height: 1.5; }
+.hist-row + .hist-row { border-top: 1px dotted var(--line); }
+.hist-when { color: var(--faint); font-variant-numeric: tabular-nums; flex: none; }
+.hist-by {
+  flex: none; font-size: 10px; font-weight: 650; padding: 1px 6px; border-radius: var(--r-chip);
+  background: var(--card-2); color: var(--muted);
+}
+.hist-by.m { color: var(--m); }
+.hist-by.f { color: var(--f); }
+.hist-by.sys { color: var(--faint); }
+.hist-what { color: var(--muted); flex: 1; min-width: 0; word-break: break-word; }
 .entry-section { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line); }
 .entry-section > h3, .result-head h3 { font-size: 12px; color: var(--muted); font-weight: 650; margin: 0 0 var(--s-3); }
 .fact-layer { background: transparent; border-radius: 0; padding: var(--s-4) 0 0; margin-bottom: 0; }
@@ -342,7 +392,9 @@
 .field textarea[disabled] { border: 1px dashed var(--line); border-radius: var(--r-md); }
 
 .seg, .mode-switch { border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; }
-.seg button, .mode-switch button { min-height: 32px; border-radius: 5px; }
+/* R3 移动端：seg/mode-switch 32px 低于 44px 触控目标（.field select 已 44px），bump 到 40px；
+   这些用在设置 modal 身份/主题、timeline/message sheet 类型/收件人/心情、add-sheet 严重度。 */
+.seg button, .mode-switch button { min-height: 40px; border-radius: 5px; }
 .seg button.active, .mode-switch button.active { color: var(--m); font-weight: 650; }
 
 .me-banner { top: 24px; border-radius: var(--r-md); box-shadow: none; }
@@ -352,8 +404,8 @@
   min-height: 38px; padding: 8px 14px; border-radius: var(--r-md);
   font-weight: 600; transition: border-color .16s, background .16s, color .16s, transform .16s, box-shadow .16s;
 }
-.action-btn.primary { box-shadow: 0 5px 14px rgba(43, 85, 91, .14); }
-.action-btn.primary:hover:not([disabled]) { filter: brightness(.96); box-shadow: 0 7px 18px rgba(43, 85, 91, .18); }
+.action-btn.primary { box-shadow: 0 5px 14px var(--sh-accent); }
+.action-btn.primary:hover:not([disabled]) { filter: brightness(.96); box-shadow: 0 7px 18px var(--sh-accent); }
 .action-btn.ghost { background: transparent; }
 .action-btn:active:not([disabled]) { transform: translateY(0) scale(.98); }
 

@@ -9,8 +9,8 @@
   --card: #FFFFFF;
   --card-2: #EEF2F0;
   --ink: #28312E;
-  --muted: #6F7A76;
-  --faint: #98A29E;
+  --muted: #646E6A;   /* R2-1 WCAG AA: on #F4F6F5 ≈ 4.86、on #EEF2F0 ≈ 4.67 */
+  --faint: #66706A;   /* R2-1 WCAG AA: 最浅表层 #EEF2F0 上 ≈ 4.55，正文级时间戳/小标签全表面达标 */
 
   /* —— 分隔 —— */
   --line: #DCE3DF;
@@ -48,6 +48,12 @@
   --sh-paper: 0 1px 2px rgba(30, 45, 40, .06);
   --sh-card: 0 8px 28px rgba(30, 45, 40, .07);
   --sh-sticky: 0 14px 36px rgba(30, 45, 40, .13);
+  --sh-accent: rgba(71, 121, 130, .16);  /* R2-7: 主题主色阴影（基于 --m #477982），各主题覆盖以避免青绿色泄漏到 non-scrapbook 主题 */
+  --sh-accent-strong: rgba(71, 121, 130, .28);
+
+  /* —— 危险色（R2-7: 原散落 4 处的硬编码 #c0564a 抽 token） —— */
+  --danger: #c0564a;
+  --danger-soft: rgba(192, 86, 74, .3);
 
   /* —— 间距尺度 —— */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;

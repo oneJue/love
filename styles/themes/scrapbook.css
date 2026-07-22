@@ -13,7 +13,7 @@
     --card-2: #29312E;
     --ink: #EDF3EF;
     --muted: #ABB8B2;
-    --faint: #74817B;
+    --faint: #9AA8A2;
     --line: #35403B;
     --line-dashed: 1px dashed #4A5852;
     --m: #79B1B7;
@@ -36,6 +36,10 @@
     --hold-bg: #343C38;
     --hold-ink: #C8D1CC;
     --tape: rgba(220, 174, 99, .28);
+    /* R3: 补 --danger 覆盖——R2-7 抽 token 时漏了，#c0564a 在暗卡(card-2 #29312E)上仅 2.97:1 连 3:1 都不达，
+       editor.css 大量用 var(--danger) 作危险按钮/错误文案文本色。提亮到 #E89284（card-2 上 5.64:1，达 AA 正文）。 */
+    --danger: #E89284;
+    --danger-soft: rgba(232, 146, 132, .28);
     --sh-paper: 0 1px 2px rgba(0,0,0,.18);
     --sh-card: 0 8px 28px rgba(0,0,0,.24);
     --sh-sticky: 0 14px 36px rgba(0,0,0,.36);

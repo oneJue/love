@@ -1,5 +1,6 @@
 // 首页关系概览与天数计时。
 import { daysSince, prettyDate } from './date-math.js';
+import { escapeHtml } from './util.js';
 
 export function mount(el, data, { onEdit } = {}) {
   const meta = data.meta || {};
@@ -30,10 +31,4 @@ export function mount(el, data, { onEdit } = {}) {
   el.querySelectorAll('[data-edit-relationship]').forEach(button => {
     button.addEventListener('click', () => { if (onEdit) onEdit(); });
   });
-}
-
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
 }

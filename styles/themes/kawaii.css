@@ -8,8 +8,8 @@
   --card: #FFFFFF;
   --card-2: #FFEEE4;
   --ink: #5A4A42;
-  --muted: #B89E92;
-  --faint: #D9C4B8;
+  --muted: #76624f;   /* R2-1 WCAG AA: on #FFFFFF ≈ 5.78:1；R3 M1: 原 #7E6B5C 在 card-2 #FFEEE4 仅 4.49 临界，下沉到 #76624f → 5.12:1 */
+  --faint: #76624f;   /* R2-1 WCAG AA: on #FFFFFF ≈ 5.78:1（实测，原注 4.92 偏保守已校准）；R3 M1: on card-2 #FFEEE4 ≈ 5.12:1（原 #806856 仅 4.61 偏紧） */
   --line: #FBE3D6;
   --line-dashed: 2px dotted #F5C9B5;
 
@@ -34,6 +34,14 @@
 
   --rot-m: -.6deg;
   --rot-f: .6deg;
+
+  /* R2-7: 主题主色阴影——避免 scrapbook 青绿色阴影泄漏到天蓝色按钮 */
+  --sh-accent: rgba(127, 196, 224, .18);
+  --sh-accent-strong: rgba(127, 196, 224, .30);
+
+  /* R3 收尾: kawaii 暖底 danger 提亮——on card-2 #FFEEE4 达 AA（原继承 #c0564a 仅 3.98:1） */
+  --danger: #B85044;
+  --danger-soft: rgba(184, 80, 68, .3);
 }
 [data-theme="kawaii"] .entry::before { width: 84px; height: 20px; border-radius: 12px; }
 [data-theme="kawaii"] .days-card .num { font-family: var(--ff-title); }

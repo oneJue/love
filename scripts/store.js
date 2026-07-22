@@ -7,15 +7,18 @@
 
 import { computeStatus, STATES, setAgreementText, setConfirmed, unconfirm } from './status-machine.js';
 import { makeEntry, genId, migrateEntry, sideLabel } from './schema.js';
+// httpBackend 既暴露 backend 接口，也暴露 SSE 注入口 setReloadCallback/connectSSE。
+// httpBackend 不能 import store 的 reload（store 已 import httpBackend → 循环依赖），
+// 故由 store 反向注入 reload 回调 + 主动开 EventSource。
+import { httpBackend, setReloadCallback, connectSSE } from './httpBackend.js';
+import { sameId } from './util.js';
 
 const KEY_DATA = 'love:data';
 const KEY_MESIDE = 'love:meSide';
 const KEY_MODE = 'love:comm-mode';
-const KEY_THEME = 'love:theme';
 
 let cache = null;
 let nowProvider = () => new Date().toISOString();
-const sameId = (left, right) => String(left) === String(right);
 
 // —— 默认 localStorage backend ——
 const localStorageBackend = {
@@ -26,11 +29,6 @@ const localStorageBackend = {
   },
   writeAll(blob) {
     localStorage.setItem(KEY_DATA, JSON.stringify(blob));
-  },
-  getEntry(id) {
-    const blob = this.readAll();
-    if (!blob || !blob.entries) return null;
-    return blob.entries.find(e => sameId(e.id, id)) || null;
   },
   upsertEntry(entry) {
     const blob = this.readAll() || { entries: [] };
@@ -43,6 +41,22 @@ const localStorageBackend = {
 };
 
 let backend = localStorageBackend;
+
+// 云端模式探测：URL 带 cloud=1 则切 httpBackend（本机跑通用）。
+// 不带则保持 localStorage 单机模式，回退完整。
+if (typeof location !== 'undefined' && location.search && location.search.includes('cloud=1')) {
+  backend = httpBackend;
+  // 反向注入 reload 给 httpBackend，并开 SSE 订阅。
+  // 用微任务延迟 connect，确保 reload/reloadCallback 引用的绑定已就绪（function 声明已提升，
+  // 但延迟到事件循环空转后建立 EventSource 更稳，避开首屏 boot 的 fetch 还在 in-flight）。
+  setReloadCallback(reload);          // 由 reload() 内部广播驱动渲染层刷新
+  Promise.resolve().then(() => { try { connectSSE(); } catch (e) { console.warn('[store] SSE 连接失败', e); } });
+}
+
+// 同步读 cache：供 app.js renderHome 等绕过 load() 直读的地方用
+export function getCachedSync() {
+  return cache;
+}
 
 // —— 订阅 ——
 const listeners = new Set();
@@ -80,8 +94,8 @@ export function setNowProvider(fn) { nowProvider = fn; }
 export async function load() {
   if (cache) return cache;
   let blob = null;
-  try { blob = backend.readAll(); }
-  catch (e) { blob = null; } // JSON 损坏：备份后回退种子
+  try { blob = await backend.readAll(); }
+  catch (e) { blob = null; } // JSON 损坏 / 后端不可达：备份后回退种子
   if (!blob) {
     // 首次 / 损坏 → fetch data.json 种子
     const res = await fetch('data.json', { cache: 'no-store' });
@@ -90,7 +104,7 @@ export async function load() {
     if (!blob.entries) blob.entries = [];
     blob.entries = blob.entries.map(migrateEntry);
     normalizeCollections(blob);
-    try { backend.writeAll(blob); } catch (_) {}
+    try { await backend.writeAll(blob); } catch (_) {}
   } else {
     if (!blob.entries) blob.entries = [];
     blob.entries = blob.entries.map(migrateEntry);
@@ -102,7 +116,12 @@ export async function load() {
 
 export async function reload() {
   cache = null;
-  return load();
+  const blob = await load();
+  // 关键：reload 后必须广播，否则渲染层（onStoreChanged 回调，app.js:39 /
+  // comm-book.js:33）不会重渲染 → 云模式实时刷新断环。传 null 表示全量刷新。
+  // 自写触发的回环 reload 也会走到这里 → 多刷一次，UI 无害（M3 接受）。
+  broadcast(null);
+  return blob;
 }
 
 export function getEntry(id) {
@@ -125,12 +144,12 @@ function assertMeSide(side) {
  * 唯一变更入口（除 createEntry 直写）。
  * mutator 改 next 对象；summary 进入 history（禁止含"同意"二字）。
  */
-function commit(entry, summary, mutator) {
+async function commit(entry, summary, mutator) {
   const next = structuredCloneSafe(entry);
   mutator(next);
   if (summary) {
     if (summary.includes('同意')) throw new Error('history.summary 禁止包含"同意"二字');
-    next.history = next.history || [];
+    if (!Array.isArray(next.history)) next.history = [];  // R2-6: 防御未来直写路径漏 migrate 的非数组 history
     next.history.push({ at: nowProvider(), by: sideLabel(getMeSide()), summary });
   }
   // 派生永远赢（INV-1）
@@ -138,7 +157,7 @@ function commit(entry, summary, mutator) {
   next.updatedAt = nowProvider();                         // INV-10
   if (next.status !== '已和解') next.resolutionDate = null; // INV-6
   if (next.shelvedFrom !== null && !STATES.slice(0, 4).includes(next.shelvedFrom)) next.shelvedFrom = null; // INV-5
-  backend.upsertEntry(next);
+  await backend.upsertEntry(next);
   // 同步内存 cache
   if (cache) {
     const i = cache.entries.findIndex(e => sameId(e.id, next.id));
@@ -153,7 +172,7 @@ function structuredCloneSafe(obj) {
 }
 
 function normalizeCollections(blob) {
-  for (const key of ['timeline', 'messages', 'photos', 'albums', 'anniversaries']) {
+  for (const key of ['timeline', 'messages', 'photos', 'anniversaries']) {
     if (!Array.isArray(blob[key])) blob[key] = [];
   }
   return blob;
@@ -169,7 +188,7 @@ async function updateData(topic, mutator) {
   mutator(next);
   normalizeCollections(next);
   next.updatedAt = nowProvider().slice(0, 10);
-  backend.writeAll(next);
+  await backend.writeAll(next);
   cache = next;
   broadcast(topic);
   return next;
@@ -205,7 +224,7 @@ export async function createEntry(input = {}) {
   }
   // createEntry 已在 makeEntry 内 push 了"创建条目" history[0]
   if (cache) cache.entries.push(entry);
-  backend.upsertEntry(entry);
+  await backend.upsertEntry(entry);
   broadcast(entry.id);
   return entry;
 }
@@ -281,12 +300,12 @@ export async function setMyConfirm(entryId, side) {
   const cur = entry.confirmations && entry.confirmations[side];
   if (cur && cur.confirmed) return entry; // 幂等
   const now = nowProvider();
-  const updated = commit(entry, side === 'male' ? '男方确认' : '女方确认', e => {
+  const updated = await commit(entry, side === 'male' ? '男方确认' : '女方确认', e => {
     e.confirmations = setConfirmed(e, side, now);
   });
   if (computeStatus(updated) === '已和解') {
     // 第二枚确认 → 写 resolutionDate（INV-6）
-    const resoled = commit(updated, '达成和解，归档', e => {
+    const resoled = await commit(updated, '达成和解，归档', e => {
       e.resolutionDate = now.slice(0, 10);
     });
     return resoled;
@@ -344,10 +363,10 @@ export async function deleteEntryIfFresh(entryId) {
   if (ageMs > 10000) throw new Error('创建超过 10 秒，不可删除（保护：永不硬删）');
   if (entry.history && entry.history.length > 1) throw new Error('已有操作历史，不可删除');
   if (cache) cache.entries = cache.entries.filter(e => !sameId(e.id, entryId));
-  const blob = backend.readAll();
+  const blob = await backend.readAll();
   if (blob) {
     blob.entries = (blob.entries || []).filter(e => !sameId(e.id, entryId));
-    backend.writeAll(blob);
+    await backend.writeAll(blob);
   }
   broadcast(entryId);
 }
@@ -372,6 +391,51 @@ export async function createTimelineItem(input = {}) {
     blob.timeline.push(created);
   });
   return created;
+}
+
+// —— 纪念日 ——
+// schema 顶层 anniversaries:[] 有首页倒计时渲染(app.js) 但 R3 之前零编辑入口零写函数=死字段。
+// 此处补 upsert/remove，经 updateData('anniversaries',...)（normalizeCollections 已含该 key；nextRecordId 复用）。
+export async function upsertAnniversary(input = {}) {
+  const title = String(input.title || '').trim();
+  const date = String(input.date || '').trim();
+  if (!title) throw new Error('请填写纪念日名称');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('请选择有效日期');
+  const recurring = Boolean(input.recurring);
+  const hasId = input.id != null;
+  const id = hasId ? input.id : null;
+  let result = null;
+  await updateData('anniversaries', blob => {
+    if (hasId) {
+      const i = blob.anniversaries.findIndex(a => sameId(a.id, id));
+      if (i >= 0) {
+        blob.anniversaries[i] = { ...blob.anniversaries[i], title, date, recurring };
+        result = blob.anniversaries[i];
+        return;
+      }
+      // R5-s1(姊妹): 编辑路径指定 id 不存在（SSE 重载/另一 tab 删了该 id）→ throw，
+      // 防止用残留 id 重新 push 一条复活已删 id（违反「id 只增不减」invariant）。
+      // memory-editor.js 的 try/catch 已统一接住走 inline-error。新建走不带 id 路径不受影响。
+      throw new Error('纪念日不存在，请刷新');
+    }
+    const created = {
+      id: hasId ? id : nextRecordId(blob.anniversaries),
+      title,
+      date,
+      recurring,
+      createdAt: nowProvider(),
+      createdBy: sideLabel(getMeSide()),
+    };
+    blob.anniversaries.push(created);
+    result = created;
+  });
+  return result;
+}
+
+export async function removeAnniversary(id) {
+  await updateData('anniversaries', blob => {
+    blob.anniversaries = blob.anniversaries.filter(a => !sameId(a.id, id));
+  });
 }
 
 export async function updateRelationshipProfile(input = {}) {
@@ -440,6 +504,20 @@ export async function markMessagesRead(side = getMeSide()) {
   return unread.length;
 }
 
+// R4 F4: 置顶切换——翻转某条留言的 pinned 字段并落盘广播。
+// 与 createMessage 一致走 updateData('messages')，onStoreChanged 订阅（messages.js:17）
+// 落盘后自动重渲染，无需调用方手挂。任一方可翻，与 createMessage 的 from=meLabel 一致语义。
+export async function toggleMessagePin(id) {
+  await load();
+  await updateData('messages', blob => {
+    const message = blob.messages.find(m => sameId(m.id, id));
+    // R5-s1: 找不到 id（残留旧 id / 删重置后点置顶按钮）直接 throw，让 messages.js:61 的 .catch(toastErr) 兜底提示；
+    // 原来静默 no-op 会让用户以为按钮失灵。
+    if (!message) throw new Error('留言不存在');
+    message.pinned = !message.pinned;
+  });
+}
+
 export async function createPhoto(meta = {}, input = {}) {
   if (!meta.storeKey || !meta.type || !meta.type.startsWith('image/')) throw new Error('请选择有效图片');
   let created = null;
@@ -478,7 +556,7 @@ export async function importFromJSON(jsonStr) {
     const { importAttachmentsBundle } = await import('./attachments.js');
     await importAttachmentsBundle(attachmentBundle);
   }
-  backend.writeAll(blob);
+  await backend.writeAll(blob);
   cache = blob;
   broadcast(null);
   return blob;
