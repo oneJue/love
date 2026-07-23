@@ -10,7 +10,7 @@ import { makeEntry, genId, migrateEntry, sideLabel } from './schema.js';
 // httpBackend 既暴露 backend 接口，也暴露 SSE 注入口 setReloadCallback/connectSSE。
 // httpBackend 不能 import store 的 reload（store 已 import httpBackend → 循环依赖），
 // 故由 store 反向注入 reload 回调 + 主动开 EventSource。
-import { httpBackend, setReloadCallback, connectSSE } from './httpBackend.js';
+import { httpBackend, setReloadCallback, connectSSE, startPolling } from './httpBackend.js';
 import { sameId } from './util.js';
 
 const KEY_DATA = 'love:data';
@@ -50,7 +50,11 @@ if (typeof location !== 'undefined' && location.search && location.search.includ
   // 用微任务延迟 connect，确保 reload/reloadCallback 引用的绑定已就绪（function 声明已提升，
   // 但延迟到事件循环空转后建立 EventSource 更稳，避开首屏 boot 的 fetch 还在 in-flight）。
   setReloadCallback(reload);          // 由 reload() 内部广播驱动渲染层刷新
-  Promise.resolve().then(() => { try { connectSSE(); } catch (e) { console.warn('[store] SSE 连接失败', e); } });
+  // SSE 在 Quick Tunnel 下不透传，但轮询兜底保证同步。两者并存。
+  Promise.resolve().then(() => {
+    try { connectSSE(); } catch (e) { console.warn('[store] SSE 连接失败', e); }
+    try { startPolling(); } catch (e) { console.warn('[store] 轮询启动失败', e); }
+  });
 }
 
 // 同步读 cache：供 app.js renderHome 等绕过 load() 直读的地方用

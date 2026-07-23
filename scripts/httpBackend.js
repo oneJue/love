@@ -11,17 +11,12 @@
 
 import { sameId } from './util.js';
 
-const API = (() => {
-  // 本步固定本机；后续从 config/readme 推导 Tunnel 域
-  if (typeof location !== 'undefined' && location.hostname) {
-    return `http://${location.hostname}:3000/api`;
-  }
-  return 'http://localhost:3000/api';
-})();
+// 同源相对路径：前端由 Express 同源托管（或经 Cloudflare Tunnel 暴露整源），
+// /api 就在当前页同源下，不写 host:port。这样 localhost、IP、tunnel 域都自动对，
+// 且 https 页面 fetch 相对路径无混合内容拦截。
+const API = '/api';
 
-// SSE events 端点与 /api 同源去掉 /api 后缀（/api/events → http://host:3000/events 不对，
-// 后端路由是 /api/events，所以 EVENTS_BASE 就是 API 去掉 /data 的根 http://host:3000/api，
-// 拼出 http://host:3000/api/events）。直接用 API 根 + '/events'。
+// SSE events 端点同源：/api/events
 const EVENTS_URL = `${API}/events`;
 
 // 内存 cache：readAll 同步返回（store.js load() 会 await，但 getEntry/listEntries
@@ -53,6 +48,25 @@ function scheduleReload() {
       needsAnother = false;
       if (again) scheduleReload(); // 期间有过新帧 → 再拉一次
     });
+}
+
+// —— 同步兜底：轮询 ——
+// Quick Tunnel（HTTP/2）不透传 SSE 流式帧（cloudflared 日志 stream canceled），
+// 浏览器 EventSource 收不到任何事件。故加轮询兜底：定时 reload 拉最新数据。
+// 仍保留 SSE：若将来 Named Tunnel 透传 SSE，两边并存谁通谁生效（轮询幂等，重复 reload 无害）。
+const POLL_MS = 3000; // 3s 延迟换可靠性
+let pollTimer = null;
+export function startPolling() {
+  if (typeof window === 'undefined') return; // 浏览器外跳过
+  if (pollTimer) return; // 幂等
+  pollTimer = setInterval(() => {
+    // 只在该页签可见时轮询，省流量；后台 tab 暂停（document.visibilityState 切回可见时首次立即拉）
+    if (document.visibilityState === 'visible') scheduleReload();
+  }, POLL_MS);
+  // tab 从后台切回前台立刻拉一次（错过期间的数据）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') scheduleReload();
+  });
 }
 
 // —— SSE 连接生命周期 ——
