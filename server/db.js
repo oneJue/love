@@ -13,6 +13,7 @@ const DATA_DIR = join(__dirname, 'data');
 const DB_PATH = join(DATA_DIR, 'love.db');
 const SEED_PATH = join(__dirname, '..', 'data.json');
 const KEY = 'love:data'; // 与 localStorage 前端 key 同名，语义一致
+const KEY_PRESENCE = 'love:presence'; // 实时状态独立 kv 行（不进主 blob，避免整 blob 放大）
 
 let db = null;
 
@@ -77,4 +78,29 @@ export function reseed(blob) {
     return m;
   });
   return blob;
+}
+
+// —— 实时状态 presence（独立 kv 行，与主 blob 隔离）——
+// 高频心跳只写 presence，不触发 reseed/不广播 data-changed/不污染主 blob，
+// 避免每次心跳触发全量 entries 状态重算 + 全员 reload + UI 闪烁放大。
+export function readPresence() {
+  const db = openDB();
+  const row = db.prepare('SELECT value FROM kv WHERE key = ?').get(KEY_PRESENCE);
+  return row ? JSON.parse(row.value) : { male: null, female: null };
+}
+
+// payload: { side, online, lastSeen, battery, charging, location, lat, lng, locAt }
+// 只覆盖 payload.side 这一侧；保留另一侧不动。
+export function writePresence(payload) {
+  const db = openDB();
+  const side = payload && payload.side;
+  if (side !== 'male' && side !== 'female') throw new Error('side 必须是 male/female');
+  const cur = readPresence();
+  // 浅合并本侧字段，保留旧值（单次上报可能只含部分字段）
+  cur[side] = { ...cur[side], ...payload };
+  db.prepare(`
+    INSERT INTO kv (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(KEY_PRESENCE, JSON.stringify(cur));
+  return cur;
 }

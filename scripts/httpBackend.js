@@ -99,6 +99,64 @@ export function connectSSE() {
   });
 }
 
+// —— 实时状态 presence 通道（独立于主 blob，不触发 reload）——
+// 在线心跳 + 电量 + 位置走 POST /api/ping 写 presence kv 行，GET /api/presence 拉。
+// 与主 blob 的 3s 轮询/SSE 链路解耦——不污染主 blob、不触发 reseed、不触发 data-changed，
+// 避免每次心跳导致沟通簿列表 reload 闪烁放大。
+const PRESENCE_URL = `${API}/presence`;
+const PING_URL = `${API}/ping`;
+
+// presence 变更订阅（与 onStoreChanged 平行，独立 channel）
+const presenceListeners = new Set();
+export function onPresenceChanged(cb) {
+  presenceListeners.add(cb);
+  return () => presenceListeners.delete(cb);
+}
+function emitPresenceChanged(presence) {
+  for (const cb of presenceListeners) { try { cb(presence); } catch (e) { console.error(e); } }
+}
+
+// 上报己方状态（side 由调用方注入）。payload 可只含部分字段，服务端浅合并本侧。
+export async function reportPresence(payload) {
+  try {
+    const res = await fetch(PING_URL, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const presence = await res.json();
+    emitPresenceChanged(presence); // 自己上报后也通知（己方侧更新）
+    return presence;
+  } catch (e) { console.warn('[httpBackend] reportPresence 失败', e); return null; }
+}
+
+// 拉取两侧 presence（展示侧用）。成功后 emit 通知状态条刷新。
+export async function fetchPresence() {
+  try {
+    const res = await fetch(PRESENCE_URL, { credentials: 'include' });
+    if (!res.ok) return null;
+    const presence = await res.json();
+    emitPresenceChanged(presence);
+    return presence;
+  } catch (e) { console.warn('[httpBackend] fetchPresence 失败', e); return null; }
+}
+
+// 拉取轮询：5s 拉一次对方状态（与主 blob 3s 轮询解耦，presence 体积极小）。
+const PRESENCE_POLL_MS = 5000;
+let presencePollTimer = null;
+export function startPresencePolling() {
+  if (typeof window === 'undefined') return;
+  if (presencePollTimer) return; // 幂等
+  presencePollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') fetchPresence();
+  }, PRESENCE_POLL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') fetchPresence();
+  });
+}
+
 export const httpBackend = {
   async readAll() {
     const res = await fetch(`${API}/data`, { credentials: 'include' });

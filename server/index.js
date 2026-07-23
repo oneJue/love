@@ -11,7 +11,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { readAll, writeAll, reseed } from './db.js';
+import { readAll, writeAll, reseed, readPresence, writePresence } from './db.js';
 import { register as sseRegister, broadcastChanged, startHeartbeat } from './sse.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,6 +76,28 @@ app.get('/api/events', (req, res) => {
 
 // —— 健康检查 ——
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+
+// —— 实时状态 presence（独立轻量通道，与主 blob 隔离）——
+// GET /api/presence：返两侧状态。服务端不判"离线"——交给展示侧按 lastSeen 过期阈值算。
+app.get('/api/presence', (req, res) => {
+  try { res.json(readPresence()); }
+  catch (e) { console.error('[GET /api/presence]', e); res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/ping：客户端心跳上报 { side, online, lastSeen, battery, charging, location, lat, lng, locAt }
+// 只写 love:presence 那一行，不触发 broadcastChanged、不污染主 blob（避免整 blob 放大 + UI 闪烁）。
+app.post('/api/ping', (req, res) => {
+  try {
+    const payload = req.body || {};
+    if (payload.side !== 'male' && payload.side !== 'female') {
+      return res.status(400).json({ error: 'side 必须是 male/female' });
+    }
+    res.json(writePresence(payload));
+  } catch (e) {
+    console.error('[POST /api/ping]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // SSE 心跳保活（15s comment 帧，防空闲断）
 startHeartbeat();
