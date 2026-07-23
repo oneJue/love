@@ -1,59 +1,76 @@
 /* =========================================================================
-   tokens.css — 设计令牌（默认清新手账风 scrapbook）
+   tokens.css — 设计令牌（默认现代蓝白风 blue）
    主题切换：由各 themes/*.css 覆盖 :root 变量，不改 DOM
    ========================================================================= */
 :root {
-  /* —— 底色 / 纸张 —— */
-  --bg: #F4F6F5;
-  --bg-grain: rgba(42, 63, 56, .035);
+  /* —— 底色（现代蓝白：柔和灰蓝底 + 纯白卡）—— */
+  --bg: #F7F9FC;
+  --bg-top: #FBFDFF;              /* 渐底顶值（光晕层之上的渐变顶端） */
+  --bg-grain: transparent;        /* 去纸纹：现代平面风 */
   --card: #FFFFFF;
-  --card-2: #EEF2F0;
-  --ink: #28312E;
-  --muted: #646E6A;   /* R2-1 WCAG AA: on #F4F6F5 ≈ 4.86、on #EEF2F0 ≈ 4.67 */
-  --faint: #66706A;   /* R2-1 WCAG AA: 最浅表层 #EEF2F0 上 ≈ 4.55，正文级时间戳/小标签全表面达标 */
+  --card-2: #EFF4FA;
+  --ink: #0F172A;                 /* slate-900，正文深色 */
+  --muted: #475569;               /* slate-600，on #F7F9FC ≈ 6.4 / on #EFF4FA ≈ 5.9，AA 达标 */
+  --faint: #64748B;               /* slate-500，on #FFFFFF ≈ 4.6，AA 达标 */
 
   /* —— 分隔 —— */
-  --line: #DCE3DF;
-  --line-dashed: 1px dashed #C8D2CD;
+  --line: #E2E8F0;                /* slate-200 */
+  --line-dashed: 1px dashed #CBD5E1;
 
-  /* —— 男 / 女方色 —— */
-  --m: #477982;             --m-soft: #E4EFF0;
-  --f: #D06F6B;             --f-soft: #FBEAE9;
+  /* —— 主色（蓝白主题：m=f 同蓝色，弱化性别色差对标现代风）—— */
+  --m: #3B82F6;                   --m-soft: #EFF6FF;     /* blue-500 / blue-50 */
+  --f: #3B82F6;                   --f-soft: #EFF6FF;
 
-  /* —— 状态色（5 态） —— */
-  --pend: #C58A2C;          --pend-bg: #FFF3DA;   --pend-ink: #805913;   /* 待沟通 */
-  --talk: #4F8791;          --talk-bg: #E3F0F2;   --talk-ink: #315D64;   /* 沟通中 */
-  --review: #8A6B91;        --review-bg: #F1EAF3; --review-ink: #5F4764; /* 待确认 */
-  --ok: #5D8B6A;            --ok-bg: #E6F1E8;     --ok-ink: #3E6549;     /* 已和解 */
-  --hold: #7C8581;          --hold-bg: #ECEFED;   --hold-ink: #555F5A;   /* 已搁置 */
+  /* —— 状态色（5 态，现代鲜亮调，AA ok） —— */
+  --pend: #F59E0B;          --pend-bg: #FFFBEB;   --pend-ink: #92400E;   /* 待沟通 - 琥珀 */
+  --talk: #3B82F6;          --talk-bg: #EFF6FF;   --talk-ink: #1E40AF;   /* 沟通中 - 蓝 */
+  --review: #8B5CF6;        --review-bg: #F5F3FF; --review-ink: #5B21B6; /* 待确认 - 紫 */
+  --ok: #10B981;            --ok-bg: #ECFDF5;     --ok-ink: #047857;    /* 已和解 - 绿 */
+  --hold: #94A3B8;          --hold-bg: #F1F5F9;   --hold-ink: #475569;   /* 已搁置 - 中性灰 */
+  --warn: #F59E0B;          /* 低电量/警示色（presence 复用） */
 
-  /* —— 和纸胶带 —— */
-  --tape: rgba(245, 213, 153, .64);
-  --tape-edge: rgba(197, 138, 44, .14);
+  /* —— 去装饰（现代风）—— 和纸胶带/微旋/纸纹全置空，自动不显示 */
+  --tape: transparent;
+  --tape-edge: transparent;
 
-  /* —— 字体 —— */
-  --ff-title: "Iowan Old Style", "Noto Serif SC", "Songti SC", serif;
-  --ff-body: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  --ff-serif: "Noto Serif SC", "Songti SC", serif;
+  /* —— 字体（现代无衬线）—— */
+  --ff-title: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-body: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-serif: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   --ff-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 
-  /* —— 圆角 —— */
-  --r-chip: 4px;
+  /* —— 圆角（现代风略大但不夸张）—— */
+  --r-chip: 6px;
   --r-sm: 8px;
-  --r-md: 8px;
-  --r-lg: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
   --r-pill: 999px;
 
-  /* —— 阴影 —— */
-  --sh-paper: 0 1px 2px rgba(30, 45, 40, .06);
-  --sh-card: 0 8px 28px rgba(30, 45, 40, .07);
-  --sh-sticky: 0 14px 36px rgba(30, 45, 40, .13);
-  --sh-accent: rgba(71, 121, 130, .16);  /* R2-7: 主题主色阴影（基于 --m #477982），各主题覆盖以避免青绿色泄漏到 non-scrapbook 主题 */
-  --sh-accent-strong: rgba(71, 121, 130, .28);
+  /* —— 阴影（现代多层柔阴影：主色 brand 层 + 中性接地层复合，五档景深）
+       paper < card < lift(card hover) < sticky < panel(modal/picker) —— */
+  --sh-paper: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --sh-card: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --sh-lift: 0 8px 20px rgba(59, 130, 246, 0.14), 0 3px 8px rgba(15, 23, 42, 0.07);
+  --sh-sticky: 0 12px 32px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --sh-panel: 0 28px 64px rgba(15, 23, 42, 0.16), 0 8px 20px rgba(59, 130, 246, 0.10);
+  --sh-accent: 0 6px 16px rgba(59, 130, 246, 0.18), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --sh-accent-strong: 0 12px 30px rgba(59, 130, 246, 0.28), 0 4px 10px rgba(15, 23, 42, 0.08);
 
-  /* —— 危险色（R2-7: 原散落 4 处的硬编码 #c0564a 抽 token） —— */
-  --danger: #c0564a;
-  --danger-soft: rgba(192, 86, 74, .3);
+  /* —— 毛玻璃底色（常驻浮层：tabbar / 照片查看器遮罩）—— */
+  --glass-bg: rgba(255, 255, 255, 0.82);
+
+  /* —— 底色光晕（底色族内 alpha 版，色板不变：blue-500 / sky-300 / blue-100）—— */
+  --glow-1: rgba(59, 130, 246, 0.10);
+  --glow-2: rgba(147, 197, 253, 0.14);
+  --glow-3: rgba(219, 234, 254, 0.40);
+
+  /* —— 动效（统一缓动曲线 + 卡片家族时长，消除 .16s-默认-ease 蔓延）—— */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-card: 0.42s;
+
+  /* —— 危险色 —— */
+  --danger: #EF4444;              /* red-500 */
+  --danger-soft: rgba(239, 68, 68, 0.3);
 
   /* —— 间距尺度 —— */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -61,9 +78,9 @@
 
   /* —— 内容宽 —— */
   --wrap: 920px;
-  --wrap-wide: 1080px;
+  --wrap-wide: 1200px;            /* 桌面宽屏断点 >=1200px 启用 */
 
-  /* —— 视角便签微旋（男左女右）—— */
-  --rot-m: -1deg;
-  --rot-f: 1deg;
+  /* —— 去微旋（现代风对齐网格，便签不旋转）—— */
+  --rot-m: 0deg;
+  --rot-f: 0deg;
 }

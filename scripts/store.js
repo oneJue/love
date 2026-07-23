@@ -10,7 +10,7 @@ import { makeEntry, genId, migrateEntry, sideLabel } from './schema.js';
 // httpBackend 既暴露 backend 接口，也暴露 SSE 注入口 setReloadCallback/connectSSE。
 // httpBackend 不能 import store 的 reload（store 已 import httpBackend → 循环依赖），
 // 故由 store 反向注入 reload 回调 + 主动开 EventSource。
-import { httpBackend, setReloadCallback, connectSSE, startPolling } from './httpBackend.js';
+import { httpBackend, setReloadCallback, connectSSE, startPolling, startPresencePolling } from './httpBackend.js';
 import { sameId } from './util.js';
 
 const KEY_DATA = 'love:data';
@@ -54,6 +54,7 @@ if (typeof location !== 'undefined' && location.search && location.search.includ
   Promise.resolve().then(() => {
     try { connectSSE(); } catch (e) { console.warn('[store] SSE 连接失败', e); }
     try { startPolling(); } catch (e) { console.warn('[store] 轮询启动失败', e); }
+    try { startPresencePolling(); } catch (e) { console.warn('[store] presence 轮询失败', e); }
   });
 }
 
@@ -79,6 +80,12 @@ function broadcast(entryId) {
 // —— 身份 / 模式 ——
 export function getMeSide() {
   return localStorage.getItem(KEY_MESIDE) || 'male';
+}
+export function getOtherSide() {
+  return getMeSide() === 'male' ? 'female' : 'male';
+}
+export function hasMeSide() {
+  return localStorage.getItem(KEY_MESIDE) != null; // 是否已设过身份
 }
 export function setMeSide(side) {
   localStorage.setItem(KEY_MESIDE, side);

@@ -12,9 +12,10 @@ import * as editor from './editor.js';
 import * as memoryEditor from './memory-editor.js';
 import { escapeHtml } from './util.js';
 import * as store from './store.js';
+import { onPresenceChanged, reportPresence } from './httpBackend.js';
 import { sideLabel } from './schema.js';
 
-const THEMES = ['scrapbook', 'minimal', 'starry', 'kawaii'];
+const THEMES = ['blue', 'pink'];
 const TABS = [
   { id: 'home',     label: '首页',   ico: '🏠' },
   { id: 'comm',     label: '沟通簿', ico: '📒' },
@@ -33,10 +34,42 @@ async function boot() {
     document.getElementById('app').innerHTML = `<div class="empty">无法加载数据：${escapeHtml(e.message)}<br>请用 <code>python3 -m http.server 8000</code> 启动后访问 http://localhost:8000</div>`;
     return;
   }
+  // 首次进入（尚未设过身份）：先选身份并记住，避免默认都是男方
+  if (!store.hasMeSide()) { openIdentityPicker(); return; }
   renderShell();
   renderTab();
   // 首页状态条随 store 变化刷新
   store.onStoreChanged(() => { if (activeTab === 'home') renderHome(); });
+}
+
+// —— 首次身份选择（轻量：本地标记，非鉴权；cloud 模式下她/你各自选一次记住）——
+function openIdentityPicker() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="picker-screen">
+      <div class="picker-card">
+        <h1>我们的</h1>
+        <p class="picker-hint">先告诉我你是谁，这样写的东西才会归到你名下。</p>
+        <div class="picker-choices">
+          <button type="button" class="picker-choice male" data-side="male">
+            <span class="dot male" aria-hidden="true"></span><strong>我是男方</strong>
+          </button>
+          <button type="button" class="picker-choice female" data-side="female">
+            <span class="dot female" aria-hidden="true"></span><strong>我是女方</strong>
+          </button>
+        </div>
+        <p class="picker-foot">选好后可以随时在右上头像里改</p>
+      </div>
+    </div>`;
+  app.querySelectorAll('.picker-choice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      store.setMeSide(btn.dataset.side);
+      renderShell();
+      renderTab();
+      store.onStoreChanged(() => { if (activeTab === 'home') renderHome(); });
+      document.querySelector('.avatar')?.focus();
+    });
+  });
 }
 
 function renderShell() {
@@ -47,6 +80,7 @@ function renderShell() {
       <span class="dot ${meSide}" aria-hidden="true"></span>
     </button>
     <div class="me-banner ${meSide}" aria-live="polite">当前以 · ${sideLabel(meSide)} · 身份操作</div>
+    <div class="status-bar" id="status-bar" aria-live="polite"></div>
     <header class="app-header">
       <h1>我们的</h1>
       <p>一次事件 · 双方视角 · 共同面对</p>
@@ -71,6 +105,123 @@ function renderShell() {
   });
   app.querySelector('#avatar').addEventListener('click', openSettings);
   app.querySelector('#fab').addEventListener('click', openAddEntry);
+  // 状态条首次占位 + 挂 presence 变更（独立 channel，无 activeTab 守卫——全局可见）
+  renderStatusBar(null);
+  if (!window._statusBarWired) {
+    window._statusBarWired = true;
+    onPresenceChanged(() => renderStatusBar());
+  }
+  startPresence();
+}
+
+// —— 顶部状态条（对方实时状态：在线/电量/位置）——
+// presence = { male: {online,lastSeen,battery,charging,location,locAt}|null, female: ... }
+// 离线判定：lastSeen 距今 > OFFLINE_MS（15s 无新 ping）判离线（崩溃/关 tab 无显式终止，靠过期阈值近似）
+const OFFLINE_MS = 15000;
+function renderStatusBar(presence) {
+  const el = document.getElementById('status-bar');
+  if (!el) return;
+  // 两段式：左侧己方（我），右侧对方（TA），中间分隔。
+  const me = store.getMeSide();
+  const other = store.getOtherSide();
+  el.innerHTML =
+    `<span class="sb-person me">${renderPersonStatus(me, presence && presence[me], true)}</span>` +
+    `<span class="sb-sep" aria-hidden="true">·</span>` +
+    `<span class="sb-person other">${renderPersonStatus(other, presence && presence[other], false)}</span>`;
+}
+
+// 渲染单人状态段：side=该侧 key, p=该侧 presence 记录(可 null), isMe=是否己方
+function renderPersonStatus(side, p, isMe) {
+  const label = isMe ? '我' : sideLabel(side); // 己方显"我"，对方显"他/她"
+  // 己方：页面开着即视为在线（不依赖 lastSeen 过期判定，自己最清楚在不在）
+  if (!p || !p.lastSeen) {
+    if (isMe) {
+      return `<span class="dot ${side} online" aria-hidden="true"></span><span class="sb-text">我在线</span>`;
+    }
+    return `<span class="dot offline" aria-hidden="true"></span><span class="sb-text">${label}还没来过</span>`;
+  }
+  const lastMs = Date.parse(p.lastSeen);
+  const ago = Date.now() - lastMs;
+  const online = isMe ? document.visibilityState === 'visible' : (!!p.online && ago < OFFLINE_MS);
+  const lastText = humanizeAgo(ago);
+  let bat = '';
+  if (typeof p.battery === 'number') {
+    const pct = Math.round(p.battery * 100);
+    const cls = pct < 20 ? ' low' : '';
+    bat = `<span class="battery${cls}" title="电量 ${pct}%${p.charging ? '·充电中' : ''}">${p.charging ? '⚡' : '🔋'}${pct}%</span>`;
+  }
+  const place = p.location ? `<span class="place">📍${escapeHtml(p.location)}</span>` : '';
+  return `
+    <span class="dot ${side} ${online ? 'online' : 'offline'}" aria-hidden="true"></span>
+    <span class="sb-text">${label}${online ? '在线' : '离线'}</span>
+    ${bat}
+    ${place}
+    ${!online ? `<span class="last-seen">${lastText}</span>` : ''}`;
+}
+
+function humanizeAgo(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return '刚刚';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}分钟前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}小时前`;
+  return prettyDate(new Date(Date.now() - ms).toISOString().slice(0, 10));
+}
+
+// —— 己方状态采集 + 上报（仅 cloud 模式 + 已设身份时启动）——
+let presenceStarted = false;
+function startPresence() {
+  if (presenceStarted) return;
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+  // 非云模式（无 cloud=1）不上报——本机单机场景没后端，presence 走不通也无意义
+  if (!location.search.includes('cloud=1')) return;
+  presenceStarted = true;
+
+  const meSide = store.getMeSide();
+  // 电量：getBattery Promise（Chromium 系；Safari 无→降级不报电量）
+  let battery = null;
+  if (navigator.getBattery) {
+    navigator.getBattery().then(b => {
+      battery = b;
+      const emitBat = () => reportPresence({ side: meSide, battery: b.level, charging: b.charging });
+      emitBat();
+      b.addEventListener('levelchange', emitBat);
+      b.addEventListener('chargingchange', emitBat);
+    }).catch(() => {});
+  }
+
+  // 心跳：每 8s 上报 online + lastSeen（lastSeen 给对方判离线阈值）
+  const PING_MS = 8000;
+  const ping = () => {
+    const online = document.visibilityState === 'visible';
+    reportPresence({ side: meSide, online, lastSeen: new Date().toISOString() });
+  };
+  ping();
+  setInterval(ping, PING_MS);
+  // 切后台/回前台立刻报一次（回前台 online:true，切走 online:false 尽力而为）
+  document.addEventListener('visibilitychange', ping);
+
+  // 位置：每 2 分钟取一次（不实时跟踪，省电省流量）。首次会触发系统授权框。
+  if (navigator.geolocation) {
+    const pollLoc = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          reportPresence({
+            side: meSide,
+            lat: latitude, lng: longitude,
+            location: `${latitude.toFixed(2)},${longitude.toFixed(2)}`, // 粗粒度坐标，暂不做完整地理编码
+            locAt: new Date().toISOString(),
+          });
+        },
+        () => {}, // 拒绝授权/失败→静默，位置文本不展示
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    };
+    pollLoc();
+    setInterval(pollLoc, 120000);
+  }
 }
 
 function renderTab() {
@@ -278,7 +429,7 @@ function renderTimeline() {
 // —— 设置 modal：身份 / 主题 / 备份 ——
 function openSettings() {
   const meSide = store.getMeSide();
-  const curTheme = localStorage.getItem('love:theme') || 'scrapbook';
+  const curTheme = localStorage.getItem('love:theme') || 'blue';
   const mask = document.createElement('div');
   mask.className = 'modal-mask';
   mask.innerHTML = `
@@ -370,23 +521,20 @@ function openAddEntry() {
 
 // —— 主题 ——
 function themeName(t) {
-  return { scrapbook: '手账风', minimal: '极简', starry: '星空', kawaii: '可爱' }[t];
+  return { blue: '蓝白', pink: '粉白' }[t];
 }
 function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
   localStorage.setItem('love:theme', t);
-  const darkScrapbook = t === 'scrapbook' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
   const themeColors = {
-    scrapbook: darkScrapbook ? '#161B19' : '#F4F6F5',
-    minimal: '#FAFAF8',
-    starry: '#14132B',
-    kawaii: '#FFF7F2',
+    blue: '#F7F9FC',
+    pink: '#FFF5F7',
   };
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = themeColors[t] || themeColors.scrapbook;
+  if (meta) meta.content = themeColors[t] || themeColors.blue;
 }
 function restoreTheme() {
-  applyTheme(localStorage.getItem('love:theme') || 'scrapbook');
+  applyTheme(localStorage.getItem('love:theme') || 'blue');
 }
 
 boot();

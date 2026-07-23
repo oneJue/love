@@ -82,6 +82,33 @@
 .me-banner.male { color: var(--m); }
 .me-banner.female { color: var(--f); }
 
+/* —— 顶部状态条（对方实时状态：在线/离线/电量/位置）——
+   全局可见，独立 presence 通道刷新（不走 onStoreChanged，不触发主 blob reload）。
+   样式沿用 me-banner 顶部 pill 套路，居中横条置于 avatar 行下、app-header 上。 */
+.status-bar {
+  position: absolute; top: var(--s-4); left: 50%; transform: translateX(-50%);
+  z-index: 40; max-width: calc(100vw - 2 * var(--s-4));
+  display: flex; align-items: center; gap: var(--s-2);
+  font-size: 11px; color: var(--muted);
+  padding: 3px 12px; border-radius: var(--r-pill);
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: var(--sh-paper); white-space: nowrap; overflow: hidden;
+}
+.status-bar .dot { width: 8px; height: 8px; border-radius: var(--r-pill); flex: none; }
+.status-bar .dot.online { background: var(--ok, #10B981); }
+.status-bar .dot.offline { background: var(--muted); opacity: .4; }
+.status-bar .dot.male.online { background: var(--m); }
+.status-bar .dot.female.online { background: var(--f); }
+.status-bar .sb-text { font-weight: 600; color: var(--ink); }
+.status-bar .battery { color: var(--muted); }
+.status-bar .battery.low { color: var(--warn, var(--f)); }
+.status-bar .place { color: var(--faint); }
+.status-bar .last-seen { color: var(--faint); }
+.status-bar .sb-person { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.status-bar .sb-person.me { opacity: .7; }   /* 己方弱化，对方为主体 */
+.status-bar .sb-person .battery { font-size: 10px; }
+.status-bar .sb-sep { color: var(--faint); opacity: .5; }
+
 /* —— 待办徽标 —— */
 .todo-badge {
   position: absolute; top: 12px; left: 12px;
@@ -232,11 +259,18 @@
 .attach-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .attach-box .no-thumb { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 11px; color: var(--muted); background: var(--card-2); }
 .attach-box .att-del {
-  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
-  border: none; border-radius: var(--r-pill); background: rgba(0,0,0,.5); color: #fff;
-  font-size: 13px; line-height: 1; cursor: pointer; padding: 0; display: none;
+  position: absolute; top: -6px; right: -6px; width: 32px; height: 32px;
+  border: none; border-radius: var(--r-pill); background: rgba(0,0,0,.75); color: #fff;
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0; display: none;
+  box-shadow: var(--sh-paper);
 }
 .attach-box:hover .att-del, .existing-attach .att-del { display: flex; align-items: center; justify-content: center; }
+/* M2: 放大后的删除 × 需溢出缩略图角落（hit-area 远大于 18px 且不再覆盖缩略图本体）。
+   放开 existing-attach 下 .attach-box 的 overflow:hidden，让 img/no-thumb 自带圆角自裁剪，
+   既保留圆角缩略图观感、又让角落删除按钮的负 offset 不被裁掉。 */
+.existing-attach .attach-box { overflow: visible; }
+.existing-attach .attach-box img,
+.existing-attach .attach-box .no-thumb { border-radius: var(--r-sm); }
 
 /* 附件选择预览（编辑器内 chip） */
 .attach-preview { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
@@ -267,7 +301,7 @@
 
 /* —— lightbox —— */
 .lightbox-mask {
-  position: fixed; inset: 0; background: rgba(20,15,10,.85); z-index: 300;
+  position: fixed; inset: 0; background: rgba(15,23,42,.85); z-index: 300;
   display: flex; align-items: center; justify-content: center; padding: var(--s-4);
 }
 .lightbox-mask img { max-width: 92vw; max-height: 88vh; border-radius: var(--r-md); box-shadow: var(--sh-sticky); }
@@ -404,8 +438,8 @@
   min-height: 38px; padding: 8px 14px; border-radius: var(--r-md);
   font-weight: 600; transition: border-color .16s, background .16s, color .16s, transform .16s, box-shadow .16s;
 }
-.action-btn.primary { box-shadow: 0 5px 14px var(--sh-accent); }
-.action-btn.primary:hover:not([disabled]) { filter: brightness(.96); box-shadow: 0 7px 18px var(--sh-accent); }
+.action-btn.primary { box-shadow: var(--sh-accent); }
+.action-btn.primary:hover:not([disabled]) { filter: brightness(.96); box-shadow: var(--sh-accent-strong); }
 .action-btn.ghost { background: transparent; }
 .action-btn:active:not([disabled]) { transform: translateY(0) scale(.98); }
 
@@ -435,6 +469,19 @@
 .media-picker:hover { border-color: var(--m) !important; background: var(--m-soft) !important; }
 
 @media (max-width: 480px) {
-  .me-banner { top: 20px; }
+  /* M2: 小屏下 me-banner 绝对定位左上，右缘（~166px）与居中 h1『我们的』左缘（~147px）
+     在 360-414px 机型重叠 ~19px；身份已由 .avatar dot 色 + aria-label 承载，banner 冗余，隐藏。 */
+  .me-banner { display: none; }
   .entry-actions .action-btn { min-height: 40px; }
+  /* 状态条小屏精简：me-banner 隐藏后腾出上方空间，状态条退为贴近顶部的窄条，
+     只留 dot + 在线/电量 + 地名首段，隐 last-seen（小屏寸土寸金）。位置下移避开右上 avatar。 */
+  .status-bar {
+    top: auto; position: static; transform: none;
+    margin: var(--s-2) auto 0; max-width: 96vw;
+    font-size: 10px; padding: 2px 10px;
+  }
+  .status-bar .last-seen,
+  .status-bar .sb-person.me { display: none; }  /* 小屏只显对方，己方让位 */
+  .status-bar .sb-sep { display: none; }
+  .status-bar .place { display: none; }  /* 小屏隐藏坐标，保留 dot+在线+电量 */
 }

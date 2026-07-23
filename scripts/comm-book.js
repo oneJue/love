@@ -246,8 +246,42 @@ function entryCard(entry, meSide, mode) {
     </div>`;
 }
 
+// —— 云模式 3s 轮询会 innerHTML 全量重建列表，用户在 comm 模式下展开的
+//   <details>（事件与双方视角 / 留痕）每轮被折叠、阅读被打断。这里在重建前后
+//   按 entryId 捕获/还原 open 态（progressive enhancement：DOM 不支持时静默跳过）。——
+function captureOpenDetails(root) {
+  const map = Object.create(null); // entryId -> Set<details 首类名>
+  const cards = root.querySelectorAll('.entry[data-id]');
+  for (const card of cards) {
+    const id = card.getAttribute('data-id');
+    if (id == null) continue;
+    const opens = new Set();
+    const ds = card.querySelectorAll('details[open]');
+    for (const d of ds) {
+      const cls = (d.className || '').split(/\s+/)[0];
+      if (cls) opens.add(cls);
+    }
+    if (opens.size) map[id] = opens;
+  }
+  return map;
+}
+
+function restoreOpenDetails(root, map) {
+  for (const id of Object.keys(map)) {
+    const card = root.querySelector(`.entry[data-id="${id}"]`);
+    if (!card) continue;
+    for (const cls of map[id]) {
+      const d = card.querySelector(`details.${cls}`);
+      if (d && !d.hasAttribute('open')) d.setAttribute('open', '');
+    }
+  }
+}
+
 function render(el) {
   store.load().then(data => {
+    // 重建前捕获用户已展开的 <details>（云模式轮询重渲染会折叠它们）
+    let openMap;
+    try { openMap = captureOpenDetails(el); } catch (_) { openMap = Object.create(null); }
     const entries = (data.entries || []).map(marshall);
     const meSide = store.getMeSide();
     const mode = store.getCommMode();
@@ -298,6 +332,9 @@ function render(el) {
       </div>
       ${filterBar}${shelvedToggle}<div class="entry-list">${listHtml}</div>`;
 
+    // 重建后还原展开态（review 模式模板已带 open；comm 模式用户展开态借此保留）
+    try { restoreOpenDetails(el, openMap); } catch (_) {}
+
     // 事件委托
     el.querySelector('.mode-switch').addEventListener('click', e => {
       const b = e.target.closest('button[data-mode]'); if (!b) return;
@@ -317,7 +354,10 @@ function render(el) {
     if (location.hash.startsWith('#entry-')) {
       const id = location.hash.slice('#entry-'.length);
       const card = el.querySelector(`.entry[data-id="${id}"]`);
-      if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // OS 减弱动效时跳过平滑滚动：CSS scroll-behavior 兜底拦不住 JS 显式 behavior:'smooth'。
+      // matchMedia 存在性短路兼容旧环境 / 测试 stub（render-smoke location.hash='' 不进此分支）。
+      const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (card) { card.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
         card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1400); }
     }
   }).catch(err => {
@@ -357,7 +397,7 @@ export function bindActions(rootEl) {
     const card = b.closest('.entry');
     const id = card && card.dataset.id;
     if (!id) return;
-    dispatchAction(b.dataset.act, id, b.dataset.side);
+    dispatchAction(b.dataset.act, id, b.dataset.side, b);
   });
 }
 
@@ -392,7 +432,7 @@ async function openLightbox(meta) {
   mask.querySelector('.photo-viewer-close').addEventListener('click', () => mask._close());
 }
 
-function dispatchAction(act, id, side) {
+function dispatchAction(act, id, side, btn) {
   const meSide = store.getMeSide();
   const entry = store.getEntry(id);
   if (!entry) return;
@@ -405,13 +445,20 @@ function dispatchAction(act, id, side) {
   } else if (act === 'edit-note') {
     editor.openNoteSheet({ entry, meSide, onDone: () => {} });
   } else if (act === 'confirm') {
+    // 云模式往返 200-1000ms：立即置 busy 防重复点击，并给"点了有反应"的即时反馈
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = '确认中…'; }
     store.setMyConfirm(id, meSide).then(updated => {
       if (computeStatus(updated) === '已和解') {
         editor.toast('对齐了 · 和解', { soft: true, duration: 4000 });
       } else {
         editor.toast('已确认', { duration: 5000, onUndo: () => store.unconfirmMine(id, meSide).catch(() => {}) });
       }
-    }).catch(err => editor.toast(err.message));
+    }).catch(err => editor.toast(err.message)).finally(() => {
+      // store 写入会触发 broadcast → render 重建列表，原按钮通常已脱离 DOM；
+      // 仅在仍连接时还原（失败路径或未重渲染时避免留下死锁的 disabled 按钮）
+      if (btn && btn.isConnected) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = origText; }
+    });
   } else if (act === 'shelve') {
     editor.openGuardSheet({
       title: '先放放这一笔？',

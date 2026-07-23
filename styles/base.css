@@ -9,9 +9,13 @@ html, body { margin: 0; padding: 0; }
 body {
   font-family: var(--ff-body);
   background-color: var(--bg);
-  /* 纸纹叠加 */
-  background-image: radial-gradient(var(--bg-grain) 1px, transparent 0);
-  background-size: 3px 3px;
+  /* 多层径向光晕底色（brand 光晕 + 浅色光晕 + 底部柔光 + 渐底）：
+     色板零改动，只在底色族内补 alpha 质感。卡片不透明覆盖在上不影响 AA。 */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 0% -10%, var(--glow-1), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, var(--glow-2), transparent 50%),
+    radial-gradient(circle at 50% 100%, var(--glow-3), transparent 42%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 38%);
   color: var(--ink);
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
@@ -50,6 +54,11 @@ a { color: var(--m); text-decoration: none; }
   background: var(--card); border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; cursor: pointer; box-shadow: var(--sh-paper); padding: 0;
+}
+/* 移动端 tap target：avatar 本体放大到 44×44（无障碍最小标准），并留出更大点击区。
+   用伪元素扩展触控范围而不撑大视觉，避免和状态条/标题挤撞。 */
+.avatar::before {
+  content: ""; position: absolute; inset: -6px; border-radius: var(--r-pill);
 }
 .avatar .dot { width: 10px; height: 10px; border-radius: var(--r-pill); }
 .avatar .dot.male { background: var(--m); }
@@ -95,7 +104,10 @@ a { color: var(--m); text-decoration: none; }
   padding: var(--s-5) var(--s-5);
   box-shadow: var(--sh-card);
   margin-bottom: var(--s-4);
+  transition: transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out), border-color var(--dur-card) var(--ease-out);
 }
+.card:hover { transform: translateY(-2px) scale(1.01); box-shadow: var(--sh-lift); }
+.card:active { transform: translateY(0); }
 
 /* —— 天数计时（首页视觉中心） —— */
 .days-card { text-align: center; padding: var(--s-7) var(--s-5); }
@@ -239,9 +251,10 @@ a { color: var(--m); text-decoration: none; }
   border: 1px solid var(--line); border-radius: var(--r-lg);
   padding: var(--s-5) var(--s-5) var(--s-4);
   margin-bottom: var(--s-4); box-shadow: var(--sh-card);
-  transform: rotate(.3deg);
+  transition: transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out), border-color var(--dur-card) var(--ease-out);
 }
-.entry:nth-child(even) { transform: rotate(-.25deg); }
+.entry:hover { transform: translateY(-2px) scale(1.01); box-shadow: var(--sh-lift); }
+.entry:active { transform: translateY(0); }
 .entry::before {  /* 顶部和纸胶带 */
   content: ""; position: absolute; top: -8px; left: 50%;
   transform: translateX(-50%) rotate(-2deg);
@@ -351,9 +364,11 @@ a { color: var(--m); text-decoration: none; }
 /* —— 底部 tab —— */
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
-  display: flex; background: var(--card); border-top: 1px solid var(--line);
+  display: flex; background: var(--glass-bg); border-top: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   max-width: var(--wrap); margin: 0 auto;
-  box-shadow: 0 -2px 12px rgba(120, 90, 50, .06);
+  box-shadow: 0 -2px 12px rgba(15, 23, 42, .05);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabbar button {
@@ -423,17 +438,23 @@ footer.app-foot { text-align: center; color: var(--faint); font-size: 12px; padd
 .polaroid {
   border: 0; color: var(--ink); font-family: var(--ff-body); cursor: pointer;
   background: #fff; padding: 8px 8px 6px; box-shadow: var(--sh-card);
-  transform: rotate(-3deg); transition: transform .2s, box-shadow .2s;
+  transition: transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out), border-color var(--dur-card) var(--ease-out);
 }
-.polaroid:nth-child(even) { transform: rotate(3deg); }
-.polaroid:hover { transform: rotate(0) scale(1.03); box-shadow: var(--sh-sticky); }
+.polaroid:hover { transform: translateY(-4px) scale(1.03); box-shadow: var(--sh-sticky); }
+.polaroid:active { transform: scale(.99); }
 .polaroid img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--card-2); }
 .polaroid .cap { display: block; font-family: var(--ff-title); text-align: center; padding: 7px 0 2px; font-size: 13px; color: var(--ink); }
 .polaroid time { display: block; text-align: center; color: var(--faint); font-size: 10px; }
 
-.photo-viewer-mask { background: rgba(18, 16, 14, .88); }
+/* 照片查看器遮罩：比 .modal-mask 略深 + 更强毛玻璃，让照片浮出；用复合选择器
+   盖过同文件靠后的 .modal-mask 兜底（该元素同时挂 modal-mask photo-viewer-mask）。 */
+.modal-mask.photo-viewer-mask {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
 .photo-viewer {
-  position: relative; max-width: min(92vw, 920px); padding: 0; overflow: hidden;
+  position: relative; max-width: min(94vw, 1400px); padding: 0; overflow: hidden;
   background: #111; border-radius: var(--r-md);
 }
 .photo-viewer > img { display: block; width: 100%; max-height: 78vh; object-fit: contain; }
@@ -478,12 +499,12 @@ footer.app-foot { text-align: center; color: var(--faint); font-size: 12px; padd
 
 /* —— 全屏提示 modal（静态版写操作引导） —— */
 .modal-mask {
-  position: fixed; inset: 0; background: rgba(40,30,20,.45); z-index: 100;
+  position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100;
   display: flex; align-items: center; justify-content: center; padding: var(--s-4);
 }
 .modal {
   background: var(--card); border-radius: var(--r-lg); padding: var(--s-6);
-  max-width: 460px; width: 100%; box-shadow: var(--sh-sticky);
+  max-width: 460px; width: 100%; box-shadow: var(--sh-panel);
   font-size: 14px; line-height: 1.7;
   max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain;
 }
@@ -535,7 +556,8 @@ summary:focus-visible,
 /* —— 视觉统一层 —— */
 body {
   text-rendering: optimizeLegibility;
-  background-size: 4px 4px;
+  background-attachment: fixed;
+  background-size: 100% 100%;
 }
 
 button { -webkit-tap-highlight-color: transparent; }
@@ -560,10 +582,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .view-toolbar strong { font-size: 17px; letter-spacing: 0; }
 .toolbar-action {
   border-radius: var(--r-md); min-height: 40px; font-weight: 650;
-  box-shadow: 0 6px 16px var(--sh-accent);
+  box-shadow: var(--sh-accent);
   transition: filter .16s, transform .16s, box-shadow .16s;
 }
-.toolbar-action:hover { filter: brightness(.96); transform: translateY(-1px); box-shadow: 0 8px 20px var(--sh-accent); }
+.toolbar-action:hover { filter: brightness(.96); transform: translateY(-1px); box-shadow: var(--sh-accent-strong); }
 .toolbar-action:active { transform: translateY(0); box-shadow: var(--sh-paper); }
 
 .card { border-radius: var(--r-md); box-shadow: var(--sh-paper); }
@@ -587,15 +609,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .home-quick-actions { gap: var(--s-3); }
 .home-quick-actions button {
   min-height: 66px; border-radius: var(--r-md); box-shadow: var(--sh-paper);
-  transition: border-color .16s, background .16s, transform .16s, box-shadow .16s;
+  transition: border-color var(--dur-card) var(--ease-out), background var(--dur-card) var(--ease-out), transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out);
 }
 .home-quick-actions button:nth-child(2) > span { color: var(--f); }
 .home-quick-actions button:nth-child(3) > span { color: var(--ok); }
-.home-quick-actions button:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px); box-shadow: var(--sh-card); }
+.home-quick-actions button:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px) scale(1.02); box-shadow: var(--sh-lift); }
 .home-quick-actions button:active { transform: translateY(0); }
 .home-quick-actions strong { font-weight: 700; }
-.home-stat { min-height: 62px; box-shadow: var(--sh-paper); transition: border-color .16s, background .16s, transform .16s, box-shadow .16s; }
-.home-stat:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px); box-shadow: var(--sh-card); }
+.home-stat { min-height: 62px; box-shadow: var(--sh-paper); transition: border-color var(--dur-card) var(--ease-out), background var(--dur-card) var(--ease-out), transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out); }
+.home-stat:hover { border-color: var(--m); background: var(--m-soft); transform: translateY(-2px) scale(1.02); box-shadow: var(--sh-lift); }
 .home-stat:active { transform: translateY(0); }
 .home-milestone { border-top: 1px solid var(--line); padding: var(--s-4) 0; }
 .home-milestone em { color: var(--f); font-weight: 600; letter-spacing: 0; }
@@ -607,19 +629,19 @@ button { -webkit-tap-highlight-color: transparent; }
 .filters { gap: var(--s-2); scrollbar-width: none; }
 .filters::-webkit-scrollbar { display: none; }
 .filters button { min-height: 34px; transition: border-color .16s, background .16s, color .16s; }
-.filters button.active { transform: none; box-shadow: 0 4px 12px var(--sh-accent); }
+.filters button.active { transform: none; box-shadow: var(--sh-accent); }
 
 .fab {
   width: 54px; height: 54px; font-size: 25px;
-  box-shadow: 0 12px 30px var(--sh-accent-strong);
+  box-shadow: var(--sh-accent-strong);
   transition: filter .16s, transform .16s, box-shadow .16s;
 }
-.fab:hover { filter: brightness(.96); transform: translateY(-2px); box-shadow: 0 16px 34px var(--sh-accent-strong); }
+.fab:hover { filter: brightness(.96); transform: translateY(-2px); box-shadow: var(--sh-accent-strong); }
 .fab:active { transform: scale(.96); }
 
 .tabbar {
   min-height: 68px;
-  box-shadow: 0 -8px 28px rgba(30, 45, 40, .07);
+  box-shadow: 0 -8px 28px rgba(15, 23, 42, .06);
 }
 .tabbar button { min-width: 0; padding: 9px 0 7px; gap: 3px; transition: color .16s, background .16s; }
 .tabbar button .ico {
@@ -638,13 +660,22 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .polaroid {
   border: 1px solid var(--line); border-radius: var(--r-sm);
-  transform: rotate(-1.2deg); transition: transform .2s, box-shadow .2s, border-color .2s;
+  transition: transform var(--dur-card) var(--ease-out), box-shadow var(--dur-card) var(--ease-out), border-color var(--dur-card) var(--ease-out);
 }
-.polaroid:nth-child(even) { transform: rotate(1.2deg); }
 .polaroid:hover { border-color: var(--m); }
 .polaroid .cap { font-weight: 600; letter-spacing: 0; }
 
-.modal-mask { background: rgba(20, 29, 26, .52); backdrop-filter: blur(3px); }
+/* 列表项 fade-up 入场：只落在不订阅轮询的列表（.tl-item 时光 / .polaroid 相册），
+   进 tab 或切筛选时重建一次，3s 轮询触达不到 —— 零重放风险。
+   用独立 `translate` 属性 keyframe，避开 .polaroid 的 transform:hover(scale)
+   与旋转；终止态==base 态，全局 reduced-motion 块归零时长即 snap 到可见态（a11y 安全）。 */
+@keyframes rise {
+  from { opacity: 0; translate: 0 10px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+.tl-item, .polaroid { animation: rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.modal-mask { background: rgba(15, 23, 42, .52); backdrop-filter: blur(3px); }
 .modal { border: 1px solid var(--line); border-radius: var(--r-md); }
 .modal h3 { font-weight: 600; letter-spacing: 0; }
 .modal button { border-radius: var(--r-md); min-height: 38px; transition: border-color .16s, background .16s, transform .16s; }
@@ -665,8 +696,56 @@ button { -webkit-tap-highlight-color: transparent; }
 
 @media (max-width: 480px) {
   .app-header { min-height: 88px; padding-top: 22px; padding-bottom: 16px; }
-  .avatar { top: 20px; }
+  .avatar { top: 18px; width: 44px; height: 44px; }
+  .avatar .dot { width: 12px; height: 12px; }
   .home-hero { padding-left: var(--s-4); padding-right: var(--s-4); }
   .days-display strong { font-size: 64px; }
   .tabbar button { font-size: 10px; }
+}
+
+/* —— 首次身份选择屏（轻量，非鉴权）—— */
+.picker-screen {
+  min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--s-4);
+}
+.picker-card {
+  max-width: 360px; width: 100%; text-align: center;
+  background: var(--card); border-radius: var(--r-lg);
+  padding: var(--s-6) var(--s-5);
+  box-shadow: var(--sh-panel);
+}
+.picker-card h1 { font-family: var(--ff-title); margin-bottom: var(--s-3); }
+.picker-hint { color: var(--muted); font-size: 14px; margin-bottom: var(--s-5); }
+.picker-choices { display: flex; flex-direction: column; gap: var(--s-3); }
+.picker-choice {
+  display: flex; align-items: center; justify-content: center; gap: var(--s-2);
+  padding: var(--s-4); border-radius: var(--r-md);
+  border: 2px solid var(--line); background: var(--card-2);
+  cursor: pointer; font-family: var(--ff-body); font-size: 16px; color: var(--ink);
+  transition: border-color .12s, transform .12s;
+}
+.picker-choice:hover { transform: translateY(-1px); }
+.picker-choice.male:hover { border-color: var(--m); }
+.picker-choice.female:hover { border-color: var(--f); }
+.picker-choice .dot { width: 12px; height: 12px; }
+.picker-foot { color: var(--faint); font-size: 12px; margin-top: var(--s-4); }
+
+/* —— D1 桌面宽屏断点：>=1200px 放宽 .wrap / .app-header / .tabbar 内容容器，
+      消除 1440/1920 大屏左右死白（"手机拉伸到桌面"短板）。.app-header / .tabbar
+      原本都引用 var(--wrap) 封顶 920px，此处一并放宽以与正文同宽，保持顶/底栏对齐。
+      移动端零影响（断点 1200px 以上才触发）。—— */
+@media (min-width: 1200px) {
+  .wrap { max-width: var(--wrap-wide); }
+  .app-header { max-width: var(--wrap-wide); }
+  .tabbar { max-width: var(--wrap-wide); }
+  /* D2: 大屏照片查看器抬升纵向利用率（小屏仍走 78vh，避免顶到浏览器边） */
+  .photo-viewer > img { max-height: 84vh; }
+}
+
+/* —— M1 移动端状态筛选 chip：34px 低于 44px 触控最小值，也低于项目自定 40px 基线
+      （editor.css 的 R3 注释已把 .seg/.mode-switch 提到 40px，却漏了同等场景的 .filters）。
+      <=520px 横向滑动点选，bump 到 40px 与家族对齐。—— */
+@media (max-width: 520px) {
+  .filters button { min-height: 40px; padding: 8px 14px; }
 }
