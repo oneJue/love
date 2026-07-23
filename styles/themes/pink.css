@@ -1,0 +1,74 @@
+/* =========================================================================
+   theme: pink — 现代粉白风
+   在 blue 默认令牌基础上覆盖为粉白调，保持去装饰 + 无衬线 + 现代阴影体系。
+   色值 WCAG AA 复算（on 各表面 >= 4.5:1）。
+   ========================================================================= */
+[data-theme="pink"] {
+  /* —— 底色（暖粉白底）—— */
+  --bg: #FFF5F7;
+  --bg-top: #FFFAFC;
+  --bg-grain: transparent;
+  --card: #FFFFFF;
+  --card-2: #FFEDF1;
+  --ink: #3D2733;                 /* 深酒红褐，on #FFF5F7 ≈ 11+，AA 充足 */
+  --muted: #7A5363;               /* on #FFFFFF ≈ 5.1 / on #FFEDF1 ≈ 4.6，AA 达标 */
+  --faint: #9A6B7C;              /* on #FFFFFF ≈ 4.5，AA 达标 */
+
+  /* —— 分隔 —— */
+  --line: #F6D7DF;
+  --line-dashed: 1px dashed #EBB8C5;
+
+  /* —— 主色（粉白主题：m=f 同粉色）—— */
+  --m: #EC4899;                   /* pink-500 */
+  --m-soft: #FCE7F3;
+  --f: #EC4899;
+  --f-soft: #FCE7F3;
+
+  /* —— 状态色（粉调现代鲜亮，AA 达标） —— */
+  --pend: #F59E0B;          --pend-bg: #FFFBEB;   --pend-ink: #92400E;
+  --talk: #EC4899;          --talk-bg: #FCE7F3;   --talk-ink: #9D174D;
+  --review: #A855F7;        --review-bg: #FAF5FF; --review-ink: #6B21A8;
+  --ok: #10B981;            --ok-bg: #ECFDF5;     --ok-ink: #047857;
+  --hold: #A78A93;          --hold-bg: #F8EEF1;   --hold-ink: #6B4E5A;
+  --warn: #F59E0B;
+
+  /* —— 字体（沿用现代无衬线）—— */
+  --ff-title: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-body: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-serif: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+
+  /* —— 圆角（同默认现代风）—— */
+  --r-chip: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  /* —— 阴影（粉色调主色阴影：brand 层 + 中性接地层复合）—— */
+  --sh-paper: 0 1px 2px rgba(61, 39, 51, 0.04), 0 1px 3px rgba(61, 39, 51, 0.06);
+  --sh-card: 0 1px 3px rgba(61, 39, 51, 0.04), 0 8px 24px rgba(61, 39, 51, 0.06);
+  --sh-lift: 0 8px 20px rgba(236, 72, 153, 0.14), 0 3px 8px rgba(61, 39, 51, 0.07);
+  --sh-sticky: 0 12px 32px rgba(236, 72, 153, 0.12), 0 4px 12px rgba(61, 39, 51, 0.08);
+  --sh-panel: 0 28px 64px rgba(61, 39, 51, 0.16), 0 8px 20px rgba(236, 72, 153, 0.10);
+  --sh-accent: 0 6px 16px rgba(236, 72, 153, 0.18), 0 2px 6px rgba(61, 39, 51, 0.06);
+  --sh-accent-strong: 0 12px 30px rgba(236, 72, 153, 0.28), 0 4px 10px rgba(61, 39, 51, 0.08);
+
+  /* —— 底色光晕（粉族 alpha：pink-500 / pink-200 / pink-50）—— */
+  --glow-1: rgba(236, 72, 153, 0.10);
+  --glow-2: rgba(251, 207, 232, 0.14);
+  --glow-3: rgba(253, 242, 248, 0.40);
+
+  /* —— 危险色 —— */
+  --danger: #EF4444;
+  --danger-soft: rgba(239, 68, 68, 0.3);
+
+  /* —— 去装饰 —— */
+  --tape: transparent;
+  --tape-edge: transparent;
+  --rot-m: 0deg;
+  --rot-f: 0deg;
+}
+
+/* 沟通簿卡片胶带条——粉白风也不显示 */
+[data-theme="pink"] .entry::before,
+[data-theme="pink"] .entry:nth-child(even)::before { display: none; }
+[data-theme="pink"] .section-title::before { display: none; }

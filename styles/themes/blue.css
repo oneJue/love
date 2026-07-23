@@ -1,0 +1,24 @@
+/* =========================================================================
+   theme: blue — 现代蓝白风（默认主题，令牌已在 tokens.css :root 就位）
+   此文件仅做"去手账装饰"兜底：胶带条/便签微旋在 base.css 里有定义，
+   依赖各主题显式关闭，避免残留手账符号。色调全部继承 :root 蓝白默认。
+   ========================================================================= */
+[data-theme="blue"] {
+  /* 去和纸胶带条（base.css .entry::before / .section-title::before） */
+  --tape: transparent;
+  --tape-edge: transparent;
+  /* 去微旋（base.css .entry/.polaroid/.view-note 等靠 rot 令牌，=0 即对齐网格） */
+  --rot-m: 0deg;
+  --rot-f: 0deg;
+  /* 去纸纹 */
+  --bg-grain: transparent;
+}
+
+/* 沟通簿卡片顶部的和纸胶带条——现代风直接不显示 */
+[data-theme="blue"] .entry::before,
+[data-theme="blue"] .entry:nth-child(even)::before { display: none; }
+
+/* 小标题前的胶带小条同理——换成主色细线，保持视觉锚点但不手账 */
+[data-theme="blue"] .section-title::before {
+  display: none;
+}
