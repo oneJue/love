@@ -33,7 +33,14 @@ export function activateDialog(mask, onClose) {
     document.removeEventListener('keydown', onKeydown);
     mask.remove();
     if (!document.querySelector('.modal-mask')) document.body.classList.remove('modal-open');
-    if (previousFocus && previousFocus.focus) previousFocus.focus();
+    // 云模式 3s 轮询会重建 origin 按钮的父卡片，previousFocus 可能已脱离 DOM，
+    // focus() 静默失败落回 <body>。先校验 isConnected，否则兜底到可见的导航控件，
+    // 键盘用户不必每次关弹窗都重新 tab 定位。
+    if (previousFocus && previousFocus.isConnected && previousFocus.focus) {
+      previousFocus.focus();
+    } else {
+      document.querySelector('.avatar, .fab, .tabbar button[aria-current]')?.focus();
+    }
     if (onClose) onClose(value);
   };
   const onKeydown = (event) => {
@@ -263,14 +270,22 @@ export function openFactSheet({ entry, meSide, onDone }) {
   });
   mask.querySelector('#fs-cancel').addEventListener('click', () => mask._close());
   mask.querySelector('#fs-save').addEventListener('click', async () => {
+    const btn = mask.querySelector('#fs-save');
     const text = mask.querySelector('#fs-desc').value.trim();
-    if (text !== (desc.text || '')) await store.writeDescription(entry.id, meSide, text);
-    for (const f of pendingFiles) {
-      try { const meta = await att.putAttachment(f); await store.addAttachment(entry.id, meSide, meta); }
-      catch (err) { console.error(err); }
+    // 云模式往返期间置 busy，防重复点击触发多次 writeDescription/IDB blob 落盘 + 广播风暴
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      if (text !== (desc.text || '')) await store.writeDescription(entry.id, meSide, text);
+      for (const f of pendingFiles) {
+        try { const meta = await att.putAttachment(f); await store.addAttachment(entry.id, meSide, meta); }
+        catch (err) { console.error(err); }
+      }
+      mask._close();
+      onDone && onDone();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '保存';
+      toast(err.message);
     }
-    mask._close();
-    onDone && onDone();
   });
 }
 
@@ -308,9 +323,16 @@ export function openViewSheet({ entry, meSide, onDone }) {
   mask.querySelector('#vs-save').addEventListener('click', async () => {
     const text = mask.querySelector('#vs-text').value.trim();
     if (!text) return;
-    await store.writeView(entry.id, side, text);
-    mask._close();
-    onDone && onDone();
+    const btn = mask.querySelector('#vs-save');
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      await store.writeView(entry.id, side, text);
+      mask._close();
+      onDone && onDone();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '保存';
+      toast(err.message);
+    }
   });
 }
 
@@ -345,14 +367,21 @@ export function openAgreementSheet({ entry, meSide, edit, onDone }) {
     </div>`);
   mask.querySelector('#ag-cancel').addEventListener('click', () => mask._close());
   mask.querySelector('#ag-save').addEventListener('click', async () => {
+    const btn = mask.querySelector('#ag-save');
     const text = mask.querySelector('#ag-text').value.trim();
     const note = mask.querySelector('#ag-note').value.trim();
     const changed = (agreement.text || '') !== text;
-    await store.writeAgreement(entry.id, meSide, text);
-    if (note !== (myNote.text || '')) await store.writeNote(entry.id, meSide, note);
-    mask._close();
-    if (changed && text) toast('改了约定，双方需重新确认');
-    onDone && onDone();
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      await store.writeAgreement(entry.id, meSide, text);
+      if (note !== (myNote.text || '')) await store.writeNote(entry.id, meSide, note);
+      mask._close();
+      if (changed && text) toast('改了约定，双方需重新确认');
+      onDone && onDone();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '保存约定';
+      toast(err.message);
+    }
   });
 }
 
@@ -373,10 +402,17 @@ export function openNoteSheet({ entry, meSide, onDone }) {
     </div>`);
   mask.querySelector('#nt-cancel').addEventListener('click', () => mask._close());
   mask.querySelector('#nt-save').addEventListener('click', async () => {
+    const btn = mask.querySelector('#nt-save');
     const text = mask.querySelector('#nt-text').value.trim();
-    await store.writeNote(entry.id, meSide, text);
-    mask._close();
-    onDone && onDone();
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      await store.writeNote(entry.id, meSide, text);
+      mask._close();
+      onDone && onDone();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '保存';
+      toast(err.message);
+    }
   });
 }
 
@@ -410,16 +446,25 @@ export function openGuardSheet({ title, hint, requireReason = false, reasonPlace
 let toastTimer = null;
 export function toast(text, { soft = false, duration = 4000, onUndo = null } = {}) {
   const old = document.querySelector('.toast');
-  if (old) old.remove();
+  if (old) {
+    // 保护撤回入口：带 onUndo 的 toast 期间若只来一条轻量状态提示，直接让位会丢失
+    // 破坏性/不可逆操作的唯一撤回路径——保留旧 toast，不替换。
+    if (old._hasUndo && !onUndo) return;
+    // 旧 toast 优雅淡出（复用其 dismiss），而不是硬切 remove，与 .show 渐入对称
+    if (old._dismiss) old._dismiss();
+    else old.remove();
+  }
   if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
   const el = document.createElement('div');
   el.className = `toast ${soft ? 'soft' : ''}`;
   el.setAttribute('role', soft ? 'status' : 'alert');
   el.setAttribute('aria-live', soft ? 'polite' : 'assertive');
   el.innerHTML = `<span class="t-text">${escapeHtml(text)}</span>${onUndo ? '<button type="button" class="undo-btn">撤回</button>' : ''}<button type="button" class="t-close" aria-label="关闭">×</button>`;
+  el._hasUndo = !!onUndo;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   const dismiss = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 200); };
+  el._dismiss = dismiss;
   el.querySelector('.t-close').addEventListener('click', dismiss);
   if (onUndo) {
     el.querySelector('.undo-btn').addEventListener('click', () => { dismiss(); onUndo(); });
