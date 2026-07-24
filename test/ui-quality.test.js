@@ -46,3 +46,18 @@ test('Q-7 回忆模式切换会同步更新新增按钮', () => {
   const source = read('scripts/comm-book.js');
   assert.match(source, /fab\.style\.display = b\.dataset\.mode === 'comm'/);
 });
+
+test('Q-8 全局搜索覆盖全部记录类型并支持快捷键', () => {
+  const source = read('scripts/app.js');
+  assert.match(source, /liveData\.entries[\s\S]*liveData\.timeline[\s\S]*liveData\.photos[\s\S]*liveData\.messages[\s\S]*liveData\.anniversaries/);
+  assert.match(source, /event\.metaKey \|\| event\.ctrlKey/);
+  assert.match(source, /id="global-search"[^>]+aria-label="搜索所有记录"/);
+});
+
+test('Q-9 首页采用品牌首屏与内容浏览双栏结构', () => {
+  const source = read('scripts/app.js');
+  assert.match(source, /class="home-intro"/);
+  assert.match(source, /className = 'home-dashboard'/);
+  assert.match(source, /className = 'home-secondary'/);
+  assert.match(source, /className = 'home-primary'/);
+});

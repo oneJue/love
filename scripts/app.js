@@ -16,11 +16,26 @@ import { onPresenceChanged, reportPresence } from './httpBackend.js';
 import { sideLabel } from './schema.js';
 
 const THEMES = ['blue', 'pink'];
+const ICON_PATHS = {
+  home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  message: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-5a7 7 0 1 1 18-2Z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+};
+
+function iconSvg(name) {
+  return `<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ICON_PATHS.heart}</svg>`;
+}
+
 const TABS = [
-  { id: 'home',     label: '首页',   ico: '🏠' },
-  { id: 'comm',     label: '沟通簿', ico: '📒' },
-  { id: 'timeline', label: '时光',   ico: '🕰️' },
-  { id: 'message',  label: '留言',   ico: '💌' },
+  { id: 'home',     label: '首页',   icon: 'home' },
+  { id: 'comm',     label: '沟通簿', icon: 'book' },
+  { id: 'timeline', label: '时光',   icon: 'clock' },
+  { id: 'message',  label: '留言',   icon: 'message' },
 ];
 
 let data = null;
@@ -76,25 +91,33 @@ function renderShell() {
   const app = document.getElementById('app');
   const meSide = store.getMeSide();
   app.innerHTML = `
-    <button type="button" class="avatar" id="avatar" aria-label="打开设置，当前身份：${sideLabel(meSide)}" title="设置 / 身份 / 主题">
-      <span class="dot ${meSide}" aria-hidden="true"></span>
-    </button>
-    <div class="me-banner ${meSide}" aria-live="polite">当前以 · ${sideLabel(meSide)} · 身份操作</div>
-    <div class="status-bar" id="status-bar" aria-live="polite"></div>
-    <header class="app-header">
-      <h1>我们的</h1>
-      <p>一次事件 · 双方视角 · 共同面对</p>
+    <header class="app-shell-header">
+      <div class="topbar">
+        <button type="button" class="brand-button" data-brand-home aria-label="返回首页">
+          <span class="brand-mark">${iconSvg('heart')}</span>
+          <span class="brand-copy"><strong>我们的</strong><small>OUR LOVE BOOK</small></span>
+        </button>
+        <nav class="tabbar" aria-label="主导航">
+          ${TABS.map(t => `<button type="button" data-tab="${t.id}" class="${t.id === activeTab ? 'active' : ''}"${t.id === activeTab ? ' aria-current="page"' : ''}><span class="ico" aria-hidden="true">${iconSvg(t.icon)}</span><span>${t.label}</span></button>`).join('')}
+        </nav>
+        <div class="status-bar" id="status-bar" aria-live="polite"></div>
+        <div class="topbar-actions">
+          <button type="button" class="search-trigger" id="global-search" aria-label="搜索所有记录" title="搜索所有记录">
+            ${iconSvg('search')}<span>搜索</span>
+          </button>
+          <button type="button" class="avatar" id="avatar" aria-label="打开设置，当前身份：${sideLabel(meSide)}" title="设置 / 身份 / 主题">
+            <span class="dot ${meSide}" aria-hidden="true"></span><span class="avatar-label">${sideLabel(meSide)}</span>
+          </button>
+        </div>
+      </div>
     </header>
-    <div class="wrap">
+    <main class="wrap">
       <div class="view" id="view-home"></div>
       <div class="view" id="view-comm"></div>
       <div class="view" id="view-timeline"></div>
       <div class="view" id="view-message"></div>
-    </div>
+    </main>
     <button type="button" class="fab" id="fab" aria-label="新增沟通记录" title="记一笔" style="display:none"><span aria-hidden="true">+</span></button>
-    <nav class="tabbar" aria-label="主导航">
-      ${TABS.map(t => `<button type="button" data-tab="${t.id}" class="${t.id === activeTab ? 'active' : ''}"${t.id === activeTab ? ' aria-current="page"' : ''}><span class="ico" aria-hidden="true">${t.ico}</span>${t.label}</button>`).join('')}
-    </nav>
     <footer class="app-foot">${data.meta && data.meta.partnerNames ? `${escapeHtml(data.meta.partnerNames.male)} & ${escapeHtml(data.meta.partnerNames.female)}` : ''} · 最后更新 ${prettyDate(data.updatedAt)}</footer>
   `;
   app.querySelector('.tabbar').addEventListener('click', e => {
@@ -103,8 +126,22 @@ function renderShell() {
     activeTab = b.dataset.tab;
     renderTab();
   });
+  app.querySelector('[data-brand-home]').addEventListener('click', () => {
+    activeTab = 'home';
+    renderTab();
+  });
   app.querySelector('#avatar').addEventListener('click', openSettings);
+  app.querySelector('#global-search').addEventListener('click', openGlobalSearch);
   app.querySelector('#fab').addEventListener('click', openAddEntry);
+  if (!window._globalSearchWired) {
+    window._globalSearchWired = true;
+    document.addEventListener('keydown', event => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        document.getElementById('global-search')?.click();
+      }
+    });
+  }
   // 状态条首次占位 + 挂 presence 变更（独立 channel，无 activeTab 守卫——全局可见）
   renderStatusBar(null);
   if (!window._statusBarWired) {
@@ -265,6 +302,27 @@ function renderHomeStats(liveData) {
   </section>`;
 }
 
+function renderHomeVisual(liveData) {
+  const photos = (liveData.photos || [])
+    .filter(photo => photo.thumb || photo.url)
+    .slice(0, 3);
+  if (photos.length) {
+    return `<div class="home-visual-photos">
+      ${photos.map((photo, index) => `<figure class="home-visual-photo photo-${index + 1}">
+        <img src="${escapeHtml(photo.thumb || photo.url)}" alt="${escapeHtml(photo.caption || '我们的照片')}" />
+        ${photo.caption ? `<figcaption>${escapeHtml(photo.caption)}</figcaption>` : ''}
+      </figure>`).join('')}
+    </div>`;
+  }
+  return `<div class="home-visual-poster" aria-hidden="true">
+    <span class="poster-index">01</span>
+    <span class="poster-kicker">KEEP THE ORDINARY</span>
+    <strong>OUR<br>DAYS</strong>
+    <span class="poster-mark">${iconSvg('heart')}</span>
+    <span class="poster-foot">TOGETHER / ALWAYS</span>
+  </div>`;
+}
+
 function renderHome() {
   const el = document.getElementById('view-home');
   const liveData = store.getCachedSync() || data;
@@ -280,11 +338,24 @@ function renderHome() {
     }),
   });
 
+  el.insertAdjacentHTML('afterbegin', `
+    <section class="home-intro" aria-labelledby="home-title">
+      <div class="home-intro-copy">
+        <span class="home-intro-kicker">OUR SHARED SPACE</span>
+        <h1 id="home-title">我们的</h1>
+        <p>把相爱的日常，一起记录好。</p>
+        <button type="button" class="home-search-button" data-home-search>
+          ${iconSvg('search')}<span>搜索所有记录</span><span aria-hidden="true">→</span>
+        </button>
+      </div>
+      <div class="home-intro-visual">${renderHomeVisual(liveData)}</div>
+    </section>`);
+
   el.insertAdjacentHTML('beforeend', `
     <div class="home-quick-actions" aria-label="快捷记录">
-      <button type="button" data-home-action="comm"><span aria-hidden="true">＋</span><strong>记一笔</strong><small>沟通事件</small></button>
-      <button type="button" data-home-action="timeline"><span aria-hidden="true">◇</span><strong>记时光</strong><small>共同回忆</small></button>
-      <button type="button" data-home-action="message"><span aria-hidden="true">✉</span><strong>写留言</strong><small>留给彼此</small></button>
+      <button type="button" data-home-action="comm"><span aria-hidden="true">${iconSvg('plus')}</span><strong>记一笔</strong><small>沟通事件</small></button>
+      <button type="button" data-home-action="timeline"><span aria-hidden="true">${iconSvg('clock')}</span><strong>记时光</strong><small>共同回忆</small></button>
+      <button type="button" data-home-action="message"><span aria-hidden="true">${iconSvg('message')}</span><strong>写留言</strong><small>留给彼此</small></button>
     </div>`);
 
   // R3 F3: 一起记录的总量统计——纯展示聚合，不写 store 不碰 schema
@@ -387,6 +458,23 @@ function renderHome() {
     el.querySelector('[data-go="timeline"]').addEventListener('click', () => { activeTab = 'timeline'; tlSubtab = 'timeline'; renderTab(); });
   }
 
+  const layout = document.createElement('div');
+  layout.className = 'home-dashboard';
+  const primary = document.createElement('div');
+  primary.className = 'home-primary';
+  const secondary = document.createElement('aside');
+  secondary.className = 'home-secondary';
+  primary.insertAdjacentHTML('afterbegin', '<div class="home-feed-head"><div><span>OUR LATEST</span><h2>我们的生活</h2></div><span>持续更新</span></div>');
+  primary.append(el.querySelector('.home-hero'), ...el.querySelectorAll('.home-section'));
+  secondary.insertAdjacentHTML('afterbegin', `
+    <button type="button" class="home-rail-search" data-home-search>${iconSvg('search')}<span>搜索</span></button>
+    <div class="home-rail-label">快捷记录</div>`);
+  secondary.append(el.querySelector('.home-quick-actions'));
+  secondary.insertAdjacentHTML('beforeend', '<div class="home-rail-label">记录总览</div>');
+  secondary.append(el.querySelector('.home-stats'), el.querySelector('.home-milestone'));
+  layout.append(secondary, primary);
+  el.append(layout);
+
   el.querySelector('[data-home-action="comm"]').addEventListener('click', openAddEntry);
   el.querySelector('[data-home-action="timeline"]').addEventListener('click', () => {
     memoryEditor.openTimelineSheet({ onDone: () => { activeTab = 'timeline'; tlSubtab = 'timeline'; renderTab(); } });
@@ -394,6 +482,7 @@ function renderHome() {
   el.querySelector('[data-home-action="message"]').addEventListener('click', () => {
     memoryEditor.openMessageSheet({ onDone: () => { activeTab = 'message'; renderTab(); } });
   });
+  el.querySelectorAll('[data-home-search]').forEach(button => button.addEventListener('click', openGlobalSearch));
 
   // R3 F3: 统计 tile 跳转——comm→沟通簿、timeline/album→时光（相册/时间线）、message→留言
   el.querySelectorAll('[data-stat-go]').forEach(btn => {
@@ -424,6 +513,133 @@ function renderTimeline() {
   const content = el.querySelector('#tl-content');
   if (tlSubtab === 'timeline') timeline.mount(content);
   else photoWall.mount(content);
+}
+
+function searchItems(liveData) {
+  const entries = (liveData.entries || []).map(entry => ({
+    key: `entry:${entry.id}`,
+    type: 'entry',
+    icon: 'book',
+    category: '沟通簿',
+    title: entry.title,
+    excerpt: entry.description?.text || entry.maleView?.text || entry.femaleView?.text || '沟通记录',
+    meta: `${prettyDate(entry.occurrenceDate)} · ${entry.status}`,
+    sortDate: entry.updatedAt || entry.occurrenceDate || '',
+    searchable: [entry.title, entry.description?.text, entry.maleView?.text, entry.femaleView?.text, ...(entry.tags || [])].filter(Boolean).join(' '),
+    id: entry.id,
+  }));
+  const memories = (liveData.timeline || []).map((item, index) => ({
+    key: `timeline:${item.id || index}`,
+    type: 'timeline',
+    icon: 'clock',
+    category: '时光',
+    title: item.title,
+    excerpt: item.desc || '共同回忆',
+    meta: prettyDate(item.date),
+    sortDate: item.date || '',
+    searchable: [item.title, item.desc, item.kind, item.createdBy].filter(Boolean).join(' '),
+  }));
+  const photos = (liveData.photos || []).map((photo, index) => ({
+    key: `photo:${photo.id || index}`,
+    type: 'photo',
+    icon: 'image',
+    category: '相册',
+    title: photo.caption || '未命名照片',
+    excerpt: '照片记录',
+    meta: photo.date ? prettyDate(photo.date) : '未标日期',
+    sortDate: photo.date || '',
+    searchable: [photo.caption, photo.date].filter(Boolean).join(' '),
+  }));
+  const notes = (liveData.messages || []).map((message, index) => ({
+    key: `message:${message.id || index}`,
+    type: 'message',
+    icon: 'message',
+    category: '留言',
+    title: message.text,
+    excerpt: `${message.from || '彼此'} · ${message.mood || '留言'}`,
+    meta: message.createdAt ? prettyDate(message.createdAt.slice(0, 10)) : '未标日期',
+    sortDate: message.createdAt || '',
+    searchable: [message.text, message.from, message.to, message.mood].filter(Boolean).join(' '),
+  }));
+  const anniversaries = (liveData.anniversaries || []).map((item, index) => ({
+    key: `anniversary:${item.id || index}`,
+    type: 'anniversary',
+    icon: 'heart',
+    category: '纪念日',
+    title: item.title,
+    excerpt: item.recurring || '值得记住的日子',
+    meta: prettyDate(item.date),
+    sortDate: item.date || '',
+    searchable: [item.title, item.date, item.recurring].filter(Boolean).join(' '),
+  }));
+  return [...entries, ...memories, ...photos, ...notes, ...anniversaries]
+    .sort((a, b) => String(b.sortDate).localeCompare(String(a.sortDate)));
+}
+
+function openGlobalSearch() {
+  if (document.querySelector('.search-mask')) return;
+  const liveData = store.getCachedSync() || data;
+  const items = searchItems(liveData);
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask search-mask';
+  mask.innerHTML = `
+    <div class="search-panel" role="dialog" aria-modal="true" aria-labelledby="global-search-title">
+      <h2 class="sr-only" id="global-search-title">搜索所有记录</h2>
+      <div class="search-field">
+        ${iconSvg('search')}
+        <input type="search" aria-label="搜索关键词" placeholder="搜索记录" autocomplete="off" />
+        <button type="button" class="search-close" aria-label="关闭搜索">×</button>
+      </div>
+      <div class="search-summary" aria-live="polite"></div>
+      <div class="search-results"></div>
+    </div>`;
+  editor.activateDialog(mask);
+  const input = mask.querySelector('input');
+  const summary = mask.querySelector('.search-summary');
+  const results = mask.querySelector('.search-results');
+
+  const close = () => mask._close();
+  const navigate = item => {
+    close();
+    if (item.type === 'entry') {
+      activeTab = 'comm';
+      location.hash = `#entry-${item.id}`;
+      renderTab();
+      setTimeout(() => { location.hash = ''; }, 1500);
+    } else if (item.type === 'timeline') {
+      activeTab = 'timeline'; tlSubtab = 'timeline'; renderTab();
+    } else if (item.type === 'photo') {
+      activeTab = 'timeline'; tlSubtab = 'album'; renderTab();
+    } else if (item.type === 'message') {
+      activeTab = 'message'; renderTab();
+    } else {
+      activeTab = 'home'; renderTab();
+    }
+  };
+  const renderResults = () => {
+    const query = input.value.trim().toLocaleLowerCase('zh-CN');
+    const matches = items.filter(item => !query || item.searchable.toLocaleLowerCase('zh-CN').includes(query)).slice(0, 12);
+    summary.textContent = query ? `${matches.length} 个结果` : '最近记录';
+    results.innerHTML = matches.length ? matches.map(item => `
+      <button type="button" class="search-result" data-search-key="${escapeHtml(item.key)}">
+        <span class="search-result-icon" aria-hidden="true">${iconSvg(item.icon)}</span>
+        <span class="search-result-copy">
+          <span class="search-result-meta"><strong>${escapeHtml(item.category)}</strong><time>${escapeHtml(item.meta)}</time></span>
+          <span class="search-result-title">${escapeHtml(item.title)}</span>
+          <span class="search-result-excerpt">${escapeHtml(item.excerpt)}</span>
+        </span>
+        <span class="search-result-arrow" aria-hidden="true">→</span>
+      </button>`).join('') : '<div class="search-empty">没有匹配的记录</div>';
+  };
+  input.addEventListener('input', renderResults);
+  mask.querySelector('.search-close').addEventListener('click', close);
+  results.addEventListener('click', event => {
+    const button = event.target.closest('[data-search-key]');
+    if (!button) return;
+    const item = items.find(candidate => candidate.key === button.dataset.searchKey);
+    if (item) navigate(item);
+  });
+  renderResults();
 }
 
 // —— 设置 modal：身份 / 主题 / 备份 ——

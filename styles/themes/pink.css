@@ -33,9 +33,9 @@
   --warn: #F59E0B;
 
   /* —— 字体（沿用现代无衬线）—— */
-  --ff-title: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
-  --ff-body: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
-  --ff-serif: "Inter", -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  --ff-title: "Manrope", "Noto Sans SC", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-body: "Manrope", "Noto Sans SC", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ff-serif: "Noto Sans SC", "Manrope", -apple-system, "Segoe UI", "PingFang SC", system-ui, sans-serif;
 
   /* —— 圆角（同默认现代风）—— */
   --r-chip: 6px;

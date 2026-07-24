@@ -15,8 +15,8 @@ let dialogId = 0;
 // 为 app 内所有弹窗提供一致的焦点、键盘和页面滚动行为。
 export function activateDialog(mask, onClose) {
   const previousFocus = document.activeElement;
-  const dialog = mask.querySelector('.modal');
-  const heading = dialog && dialog.querySelector('h3');
+  const dialog = mask.querySelector('.modal, [role="dialog"]');
+  const heading = dialog && dialog.querySelector('h1, h2, h3');
   if (dialog) {
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('aria-modal', 'true');
